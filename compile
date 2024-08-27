@@ -1,0 +1,12 @@
+#!/bin/bash
+
+project_name="atui"
+
+if [ ! -d build ]; then
+	if [ $(mkdir build) ]; then # if error
+		echo "cannot make 'build' dir"
+		exit
+	fi
+fi
+
+gcc -Wall -Wextra -O3 src/main.c src/ui/tui.c -o "build/$project_name"
