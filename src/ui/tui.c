@@ -650,7 +650,7 @@ void _tui_delete_box(WIDGET *box) {
   free(box->metadata);
 }
 
-WIDGET_ARRAY *tui_make_widget_array(size_t size, ...) {
+WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...) {
   va_list arg_pointer;
   va_start(arg_pointer, size);
 

@@ -155,7 +155,9 @@ extern BOX_METADATA *_tui_make_box_metadata(WIDGET *restrict child, int width,
                                             int height, COLOR color);
 extern void _tui_delete_box(WIDGET *restrict box);
 
-extern WIDGET_ARRAY *tui_make_widget_array(size_t size, ...);
+extern WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...);
 extern void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array);
+
+#define tui_make_widget_array(...) tui_make_widget_array_raw(sizeof((WIDGET* []) {__VA_ARGS__}) / sizeof(WIDGET*), __VA_ARGS__)
 
 #endif
