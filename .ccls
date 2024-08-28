@@ -1,0 +1,12 @@
+gcc
+# compiler driver
+
+%c -std=c23
+# %cpp -std=c++23
+
+# add this to support `.hpp` files as C++ headers
+# %hpp -x
+# %hpp c++-header
+
+%h -x
+%h c-header

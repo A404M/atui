@@ -1,10 +1,13 @@
-#include "ui/tui.h"
 #include <stdio.h>
 #include <unistd.h>
 
+#include "ui/tui.h"
+
 bool is_clicked = false;
 
-void on_button_click(MOUSE_ACTION mouse_action) { is_clicked = !is_clicked; }
+void on_button_click(const MOUSE_ACTION *mouse_action) {
+  is_clicked = !is_clicked;
+}
 
 WIDGET *ui_build(TUI *tui) {
   if (is_clicked) {
@@ -17,10 +20,7 @@ WIDGET *ui_build(TUI *tui) {
                 tui_make_box(
                     20, 3,
                     tui_make_column(tui_make_widget_array(
-                        2,
-                        tui_make_text(
-                            "This is the second page",
-                            COLOR_BLUE),
+                        2, tui_make_text("This is the second page", COLOR_BLUE),
                         tui_make_button(tui_make_text("       Back", COLOR_RED),
                                         on_button_click))),
 
@@ -34,10 +34,9 @@ WIDGET *ui_build(TUI *tui) {
             tui_make_row(tui_make_widget_array(
                 2, tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
                 tui_make_button(
-                    tui_make_box(
-                        16, 3,
-                            tui_make_text("\nClick here", COLOR_BLUE),
-                        COLOR_WHITE),
+                    tui_make_box(16, 3,
+                                 tui_make_text("\nClick here", COLOR_BLUE),
+                                 COLOR_WHITE),
                     on_button_click))))),
         COLOR_MAGENTA);
   }
@@ -46,7 +45,7 @@ WIDGET *ui_build(TUI *tui) {
 int main() {
   TUI *tui = tui_init();
 
-  tui_start_app(tui, ui_build);
+  tui_start_app(tui, ui_build, 144);
 
   tui_delete(tui);
 

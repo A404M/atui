@@ -1,17 +1,23 @@
 #ifndef A404M_UI_TUI
 #define A404M_UI_TUI 1
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
-#include <stdint.h>
+
+extern const int MAX_WIDTH;
+extern const int MAX_HEIGHT;
+
+extern const int MIN_WIDTH;
+extern const int MIN_HEIGHT;
 
 typedef enum MOUSE_BUTTON {
   MOUSE_BUTTON_LEFT_CLICK = 32,
   MOUSE_BUTTON_MIDDLE_CLICK = 33,
   MOUSE_BUTTON_RIGHT_CLICK = 34,
   MOUSE_BUTTON_SCROLL_UP = 96,
-  MOUSE_BUTTON_SCROLL_DOWN = 97
+  MOUSE_BUTTON_SCROLL_DOWN = 97,
 } MOUSE_BUTTON;
 
 typedef struct MOUSE_ACTION {
@@ -20,7 +26,7 @@ typedef struct MOUSE_ACTION {
   unsigned int y;
 } MOUSE_ACTION;
 
-typedef void (*ON_CLICK_CALLBACK)(MOUSE_ACTION mouse_action);
+typedef void (*ON_CLICK_CALLBACK)(const MOUSE_ACTION *mouse_action);
 
 #ifndef __cplusplus
 typedef enum bool : uint8_t { false = 0, true = 1 } bool;
@@ -99,7 +105,7 @@ typedef struct BOX_METADATA {
 typedef WIDGET *(*WIDGET_BUILDER)(TUI *tui);
 
 extern TUI *tui_init();
-extern void tui_delete(TUI *tui);
+extern void tui_delete(TUI *restrict tui);
 extern void tui_refresh(TUI *tui);
 
 extern int tui_get_width(TUI *tui);
@@ -110,38 +116,46 @@ extern int tui_move_to(int x, int y);
 
 extern int tui_clear_screen();
 
-extern void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder);
-extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
-                             int width_end, int height_begin, int height_end,
-                             int *child_width, int *childHeight);
-extern void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder);
+extern void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder, int fps);
+extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget,
+                                      int width_begin, int width_end,
+                                      int height_begin, int height_end,
+                                      int *child_width, int *childHeight);
+
+extern bool widget_eqauls(const WIDGET *restrict left, const WIDGET *restrict right);
+extern bool widget_array_eqauls(const WIDGET_ARRAY *restrict left, const WIDGET_ARRAY * restrict right);
+
+extern void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps);
 
 extern WIDGET *tui_new_widget(WIDGET_TYPE type, void *metadata);
-extern void tui_delete_widget(WIDGET *widget);
+extern void tui_delete_widget(WIDGET *restrict widget);
 
-extern WIDGET *tui_make_text(char *text, COLOR color);
-extern TEXT_METADATA *_tui_make_text_metadata(char *text, COLOR color);
-extern void _tui_delete_text(WIDGET *text);
+extern WIDGET *tui_make_text(char *restrict text, COLOR color);
+extern TEXT_METADATA *_tui_make_text_metadata(char *restrict text, COLOR color);
+extern void _tui_delete_text(WIDGET *restrict text);
 
-extern WIDGET *tui_make_button(WIDGET *child, ON_CLICK_CALLBACK callback);
-extern BUTTON_METADATA *_tui_make_button_metadata(WIDGET *child,
+extern WIDGET *tui_make_button(WIDGET *restrict child,
+                               ON_CLICK_CALLBACK callback);
+extern BUTTON_METADATA *_tui_make_button_metadata(WIDGET *restrict child,
                                                   ON_CLICK_CALLBACK callback);
-extern void _tui_delete_button(WIDGET *button);
+extern void _tui_delete_button(WIDGET *restrict button);
 
-extern WIDGET *tui_make_column(WIDGET_ARRAY *children);
-extern COLUMN_METADATA *_tui_make_column_metadata(WIDGET_ARRAY *children);
-extern void _tui_delete_column(WIDGET *column);
+extern WIDGET *tui_make_column(WIDGET_ARRAY *restrict children);
+extern COLUMN_METADATA *
+_tui_make_column_metadata(WIDGET_ARRAY *restrict children);
+extern void _tui_delete_column(WIDGET *restrict column);
 
-extern WIDGET *tui_make_row(WIDGET_ARRAY *children);
-extern ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *children);
-extern void _tui_delete_row(WIDGET *row);
+extern WIDGET *tui_make_row(WIDGET_ARRAY *restrict children);
+extern ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *restrict children);
+extern void _tui_delete_row(WIDGET *restrict row);
 
-extern WIDGET *tui_make_box(int width, int height, WIDGET *child, COLOR color);
-extern BOX_METADATA *_tui_make_box_metadata(WIDGET *child, int width,
+extern WIDGET *tui_make_box(int width, int height, WIDGET *restrict child,
+                            COLOR color);
+extern BOX_METADATA *_tui_make_box_metadata(WIDGET *restrict child, int width,
                                             int height, COLOR color);
-extern void _tui_delete_box(WIDGET *box);
+extern void _tui_delete_box(WIDGET *restrict box);
 
-extern WIDGET_ARRAY *tui_make_widget_array(int size, ...);
-extern void _tui_delete_widget_array(WIDGET_ARRAY *widget_array);
+extern WIDGET_ARRAY *tui_make_widget_array(size_t size, ...);
+extern void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array);
 
 #endif

@@ -7,12 +7,18 @@
 #include <time.h>
 #include <unistd.h>
 
+const int MAX_WIDTH = -1;
+const int MAX_HEIGHT = -1;
+
+const int MIN_WIDTH = -2;
+const int MIN_HEIGHT = -2;
+
 void _tui_clear_cells(TUI *tui) {
   const TERMINAL_CELL empty = {.c = ' ',
                                .color = COLOR_NO_COLOR,
                                .background_color = COLOR_NO_COLOR,
                                .on_click_callback = NULL};
-  for (int i = 0; i < tui->cells_length; ++i) {
+  for (size_t i = 0; i < tui->cells_length; ++i) {
     tui->cells[i] = empty;
   }
 }
@@ -56,9 +62,7 @@ TUI *tui_init() {
   return tui;
 }
 
-void tui_delete(TUI *tui) {
-  const int width = tui_get_width(tui);
-
+void tui_delete(TUI *restrict tui) {
   // Revert the terminal back to its original state
   write(STDOUT_FILENO, "\e[?9l", 5);
   write(STDOUT_FILENO, "\e[?47l", 6);
@@ -111,8 +115,8 @@ void tui_get_cursor_pos(TUI *tui, int *x, int *y) {
     read(STDIN_FILENO, buf, sizeof(buf));
 
     sscanf(buf, "\033[%d;%dR", y, x);
-    --x;
-    --y;
+    --*x;
+    --*y;
   }
   tcsetattr(0, TCSANOW, &tui->raw);
 }
@@ -154,9 +158,9 @@ void _tui_set_cell_on_click_callback(TUI *tui, int x, int y,
       on_click_callback;
 }
 
-void tui_handle_mouse_action(TUI *tui, MOUSE_ACTION mouse_action) {
+void tui_handle_mouse_action(TUI *tui, const MOUSE_ACTION *mouse_action) {
   const ON_CLICK_CALLBACK callback =
-      tui->cells[_tui_get_cell_index(tui, mouse_action.x, mouse_action.y)]
+      tui->cells[_tui_get_cell_index(tui, mouse_action->x, mouse_action->y)]
           .on_click_callback;
   if (callback != NULL) {
     callback(mouse_action);
@@ -191,12 +195,12 @@ bool handle_input(TUI *tui) {
     read(STDIN_FILENO, &buff, 5);
     switch (buff[1]) {
     case 77: {
-      MOUSE_ACTION mouse_action = {
+      const MOUSE_ACTION mouse_action = {
           .button = buff[2],
           .x = buff[3] - 32 - 1, // starts at 0
           .y = buff[4] - 32 - 1, // starts at 0
       };
-      tui_handle_mouse_action(tui, mouse_action);
+      tui_handle_mouse_action(tui, &mouse_action);
       /*printf("button:%u\n\rx:%u\n\ry:%u\n\n\r", mouse_action.button,*/
       /*       mouse_action.x, mouse_action.y);*/
     } break;
@@ -215,22 +219,33 @@ bool handle_input(TUI *tui) {
     case 'l':
       tui_move_right(1);
       break;
-      case 'q':
+    case 'q':
       return true;
+    case '\r': { // <ENTER>
+      int x, y;
+      tui_get_cursor_pos(tui, &x, &y);
+      const MOUSE_ACTION mouse_action = {
+          .button = MOUSE_BUTTON_LEFT_CLICK,
+          .x = x,
+          .y = y,
+      };
+      tui_handle_mouse_action(tui, &mouse_action);
+    } break;
     case '\b':
     case 127: // back space
       tui_delete_before();
       break;
     default:
       /*printf("unknown:%c,%d\n\r", buff[0], buff[0]);*/
+      /*sleep(1);*/
       break;
     }
   }
   return false;
 }
 
-void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder) {
-  tui_main_loop(tui, widget_builder);
+void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
+  tui_main_loop(tui, widget_builder, fps);
 }
 
 void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
@@ -240,12 +255,10 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
   case WIDGET_TYPE_TEXT: {
     const TEXT_METADATA *metadata = widget->metadata;
     const int width_diff = width_end - width_begin;
-    const int text_len = strlen(metadata->text);
-    int inserted_index = 0;
+    const size_t text_len = strlen(metadata->text);
+    size_t inserted_index = 0;
     int height = height_begin;
     for (; height < height_end; ++height) {
-      const int begin = (height - height_begin) * width_diff;
-
       for (int j = 0; j < width_diff; ++j) {
         const int x = width_begin + j;
         const int y = height;
@@ -286,7 +299,7 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
     const COLUMN_METADATA *metadata = widget->metadata;
     *child_width = width_begin;
     *child_height = height_begin;
-    for (int i = 0; i < metadata->children->size; ++i) {
+    for (size_t i = 0; i < metadata->children->size; ++i) {
       const WIDGET *child = metadata->children->widgets[i];
       int width_temp;
       _tui_draw_widget_to_cells(tui, child, width_begin, width_end,
@@ -301,7 +314,7 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
     const ROW_METADATA *metadata = widget->metadata;
     *child_width = width_begin;
     *child_height = height_begin;
-    for (int i = 0; i < metadata->children->size; ++i) {
+    for (size_t i = 0; i < metadata->children->size; ++i) {
       const WIDGET *child = metadata->children->widgets[i];
       int height_temp;
       _tui_draw_widget_to_cells(tui, child, *child_width, width_end,
@@ -315,12 +328,12 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
   case WIDGET_TYPE_BOX: {
     const BOX_METADATA *metadata = widget->metadata;
 
-    if (metadata->width != -1) {
+    if (metadata->width != MAX_WIDTH) {
       width_end = metadata->width + width_begin >= width_end
                       ? width_end
                       : metadata->width + width_begin;
     }
-    if (metadata->height != -1) {
+    if (metadata->height != MAX_HEIGHT) {
       height_end = metadata->height + height_begin >= height_end
                        ? height_end
                        : metadata->height + height_begin;
@@ -372,7 +385,7 @@ void _tui_draw_cells_to_terminal(TUI *tui) {
   COLOR last_color = COLOR_NO_COLOR;
   COLOR last_background_color = COLOR_NO_COLOR;
 
-  for (int i = 0; i < tui->cells_length; ++i) {
+  for (size_t i = 0; i < tui->cells_length; ++i) {
     const TERMINAL_CELL cell = tui->cells[i];
 
     if (last_color != cell.color ||
@@ -403,11 +416,94 @@ void _tui_draw_cells_to_terminal(TUI *tui) {
   write(STDOUT_FILENO, str, len);
 }
 
-void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder) {
+int kbhit() {
+  struct timeval tv = {0L, 0L};
+  fd_set fds;
+  FD_ZERO(&fds);
+  FD_SET(0, &fds);
+  return select(1, &fds, NULL, NULL, &tv) > 0;
+}
+
+bool widget_array_eqauls(const WIDGET_ARRAY *restrict left, const WIDGET_ARRAY *restrict right) {
+  if (left->size != right->size) {
+    return false;
+  }
+  for (size_t i = 0; i < left->size; ++i) {
+    if (!widget_eqauls(left->widgets[i], right->widgets[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool widget_eqauls(const WIDGET *restrict left, const WIDGET *restrict right) {
+  if (left == NULL || right == NULL) {
+    return left == NULL && right == NULL;
+  }
+  if (left->type != right->type) {
+    return false;
+  }
+
+  switch (left->type) {
+  case WIDGET_TYPE_TEXT: {
+    const TEXT_METADATA *left_data = left->metadata;
+    const TEXT_METADATA *right_data = right->metadata;
+    return left_data->color == right_data->color &&
+           strcmp(left_data->text, right_data->text) == 0;
+  } break;
+  case WIDGET_TYPE_BUTTON: {
+    const BUTTON_METADATA *left_data = left->metadata;
+    const BUTTON_METADATA *right_data = right->metadata;
+    return left_data->callback == right_data->callback &&
+           widget_eqauls(left_data->child, right_data->child);
+  } break;
+  case WIDGET_TYPE_COLUMN: {
+    const COLUMN_METADATA *left_data = left->metadata;
+    const COLUMN_METADATA *right_data = right->metadata;
+    return widget_array_eqauls(left_data->children, right_data->children);
+  } break;
+  case WIDGET_TYPE_ROW: {
+    const ROW_METADATA *left_data = left->metadata;
+    const ROW_METADATA *right_data = right->metadata;
+    return widget_array_eqauls(left_data->children, right_data->children);
+  } break;
+  case WIDGET_TYPE_BOX: {
+    const BOX_METADATA *left_data = left->metadata;
+    const BOX_METADATA *right_data = right->metadata;
+    return left_data->width == right_data->width &&
+           left_data->height == right_data->height &&
+           left_data->color == right_data->color &&
+           widget_eqauls(left_data->child, right_data->child);
+  } break;
+  default:
+    fprintf(stderr, "Type error '%d' in tui_delete_widget\n", left->type);
+    exit(1);
+  }
+
+  return true;
+}
+
+const int NANO_TO_SECOND = 1000000000;
+
+void nano_sleep(long int nano_seconds) {
+  struct timespec remaining,
+      request = {nano_seconds / NANO_TO_SECOND, nano_seconds % NANO_TO_SECOND};
+  nanosleep(&request, &remaining);
+}
+
+long int nano_time() {
+  struct timespec t = {0, 0}, tend = {0, 0};
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  return t.tv_sec * NANO_TO_SECOND + t.tv_nsec;
+}
+
+void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
+  const long int frame_nano = NANO_TO_SECOND / fps;
   while (1) {
+    const long int start = nano_time();
+    tui_save_cursor();
     tui_refresh(tui);
     WIDGET *root_widget = widget_builder(tui);
-    tui_save_cursor();
     _tui_clear_cells(tui);
 
     int width, height;
@@ -416,9 +512,17 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder) {
 
     _tui_draw_cells_to_terminal(tui);
     tui_delete_widget(root_widget);
+    /*tui_move_to(0, 0);*/
+    /*printf("%ld\t%ld", last_frame_time, frame_nano);*/
     tui_restore_cursor();
-    if (handle_input(tui)) {
-      return;
+    if (fps != -1) {
+      const long int diff = nano_time() - start;
+      nano_sleep(frame_nano-diff);
+    }
+    if (kbhit()) {
+      if (handle_input(tui)) {
+        return;
+      }
     }
   }
 }
@@ -430,7 +534,7 @@ WIDGET *tui_new_widget(WIDGET_TYPE type, void *metadata) {
   return widget;
 }
 
-void tui_delete_widget(WIDGET *widget) {
+void tui_delete_widget(WIDGET *restrict widget) {
   if (widget == NULL) {
     return;
   }
@@ -457,11 +561,11 @@ void tui_delete_widget(WIDGET *widget) {
   free(widget);
 }
 
-WIDGET *tui_make_text(char *text, COLOR color) {
+WIDGET *tui_make_text(char *restrict text, COLOR color) {
   return tui_new_widget(WIDGET_TYPE_TEXT, _tui_make_text_metadata(text, color));
 }
 
-TEXT_METADATA *_tui_make_text_metadata(char *text, COLOR color) {
+TEXT_METADATA *_tui_make_text_metadata(char *restrict text, COLOR color) {
   TEXT_METADATA *metadata = malloc(sizeof(TEXT_METADATA));
   metadata->text = malloc(strlen(text) + 1);
   strcpy(metadata->text, text);
@@ -469,17 +573,17 @@ TEXT_METADATA *_tui_make_text_metadata(char *text, COLOR color) {
   return metadata;
 }
 
-void _tui_delete_text(WIDGET *text) {
+void _tui_delete_text(WIDGET *restrict text) {
   free(((TEXT_METADATA *)text->metadata)->text);
   free(text->metadata);
 }
 
-WIDGET *tui_make_button(WIDGET *child, ON_CLICK_CALLBACK callback) {
+WIDGET *tui_make_button(WIDGET *restrict child, ON_CLICK_CALLBACK callback) {
   return tui_new_widget(WIDGET_TYPE_BUTTON,
                         _tui_make_button_metadata(child, callback));
 }
 
-BUTTON_METADATA *_tui_make_button_metadata(WIDGET *child,
+BUTTON_METADATA *_tui_make_button_metadata(WIDGET *restrict child,
                                            ON_CLICK_CALLBACK callback) {
   BUTTON_METADATA *metadata = malloc(sizeof(BUTTON_METADATA));
   metadata->child = child;
@@ -487,51 +591,52 @@ BUTTON_METADATA *_tui_make_button_metadata(WIDGET *child,
   return metadata;
 }
 
-void _tui_delete_button(WIDGET *button) {
+void _tui_delete_button(WIDGET *restrict button) {
   tui_delete_widget(((BUTTON_METADATA *)button->metadata)->child);
   free(button->metadata);
 }
 
-WIDGET *tui_make_column(WIDGET_ARRAY *children) {
+WIDGET *tui_make_column(WIDGET_ARRAY *restrict children) {
   return tui_new_widget(WIDGET_TYPE_COLUMN,
                         _tui_make_column_metadata(children));
 }
 
-COLUMN_METADATA *_tui_make_column_metadata(WIDGET_ARRAY *children) {
+COLUMN_METADATA *_tui_make_column_metadata(WIDGET_ARRAY *restrict children) {
   COLUMN_METADATA *metadata = malloc(sizeof(COLUMN_METADATA));
   metadata->children = children;
   return metadata;
 }
 
-void _tui_delete_column(WIDGET *column) {
+void _tui_delete_column(WIDGET *restrict column) {
   COLUMN_METADATA *metadata = column->metadata;
   _tui_delete_widget_array(metadata->children);
   free(column->metadata);
 }
 
-WIDGET *tui_make_row(WIDGET_ARRAY *children) {
+WIDGET *tui_make_row(WIDGET_ARRAY *restrict children) {
   return tui_new_widget(WIDGET_TYPE_ROW, _tui_make_row_metadata(children));
 }
 
-ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *children) {
+ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *restrict children) {
   ROW_METADATA *metadata = malloc(sizeof(ROW_METADATA));
   metadata->children = children;
   return metadata;
 }
 
-void _tui_delete_row(WIDGET *row) {
+void _tui_delete_row(WIDGET *restrict row) {
   ROW_METADATA *metadata = row->metadata;
   _tui_delete_widget_array(metadata->children);
   free(row->metadata);
 }
 
-WIDGET *tui_make_box(int width, int height, WIDGET *child, COLOR color) {
+WIDGET *tui_make_box(int width, int height, WIDGET *restrict child,
+                     COLOR color) {
   return tui_new_widget(WIDGET_TYPE_BOX,
                         _tui_make_box_metadata(child, width, height, color));
 }
 
-BOX_METADATA *_tui_make_box_metadata(WIDGET *child, int width, int height,
-                                     COLOR color) {
+BOX_METADATA *_tui_make_box_metadata(WIDGET *restrict child, int width,
+                                     int height, COLOR color) {
   BOX_METADATA *metadata = malloc(sizeof(BOX_METADATA));
   metadata->width = width;
   metadata->height = height;
@@ -545,13 +650,13 @@ void _tui_delete_box(WIDGET *box) {
   free(box->metadata);
 }
 
-WIDGET_ARRAY *tui_make_widget_array(int size, ...) {
+WIDGET_ARRAY *tui_make_widget_array(size_t size, ...) {
   va_list arg_pointer;
   va_start(arg_pointer, size);
 
   WIDGET **widgets = malloc(size * sizeof(WIDGET **));
 
-  for (int i = 0; i < size; ++i) {
+  for (size_t i = 0; i < size; ++i) {
     widgets[i] = va_arg(arg_pointer, WIDGET *);
   }
   va_end(arg_pointer);
@@ -563,7 +668,7 @@ WIDGET_ARRAY *tui_make_widget_array(int size, ...) {
   return widget_array;
 }
 
-void _tui_delete_widget_array(WIDGET_ARRAY *widget_array) {
+void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array) {
   for (size_t i = 0; i < widget_array->size; ++i) {
     tui_delete_widget(widget_array->widgets[i]);
   }
