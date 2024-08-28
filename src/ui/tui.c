@@ -7,28 +7,6 @@
 #include <time.h>
 #include <unistd.h>
 
-void _tui_init_callbacks(TUI *tui) {
-  const int width = tui_get_width(tui);
-  const int height = tui_get_height(tui);
-
-  tui->on_click_callbacks = malloc(width * sizeof(ON_CLICK_CALLBACK *));
-  for (int i = 0; i < width; ++i) {
-    tui->on_click_callbacks[i] = malloc(height * sizeof(ON_CLICK_CALLBACK));
-
-    for (int j = 0; j < height; ++j) {
-      tui->on_click_callbacks[i][j] = NULL;
-    }
-  }
-}
-
-void _tui_delete_callbacks(TUI *tui, int width) {
-  for (int i = 0; i < width; ++i) {
-    free(tui->on_click_callbacks[i]);
-  }
-
-  free(tui->on_click_callbacks);
-}
-
 void _tui_clear_cells(TUI *tui) {
   const TERMINAL_CELL empty = {.c = ' ',
                                .color = COLOR_NO_COLOR,
@@ -72,7 +50,6 @@ TUI *tui_init() {
   // Enable mouse tracking
   write(STDOUT_FILENO, "\e[?9h", 5);
 
-  _tui_init_callbacks(tui);
   _tui_init_cells(tui);
 
   tui_refresh(tui);
@@ -89,7 +66,7 @@ void tui_delete(TUI *tui) {
 
   tui_move_to(tui->init_cursor_x, tui->init_cursor_y);
 
-  _tui_delete_callbacks(tui, width);
+  _tui_delete_cells(tui);
   free(tui);
 }
 
@@ -102,9 +79,7 @@ void tui_refresh(TUI *tui) {
   if (width == tui_get_width(tui) && height == tui_get_height(tui)) {
     return;
   }
-  _tui_delete_callbacks(tui, width);
   _tui_delete_cells(tui);
-  _tui_init_callbacks(tui);
   _tui_init_cells(tui);
 }
 
@@ -176,7 +151,7 @@ void _tui_set_cell_on_click_callback(TUI *tui, int x, int y,
 
 void tui_handle_mouse_action(TUI *tui, MOUSE_ACTION mouse_action) {
   const ON_CLICK_CALLBACK callback =
-      tui->on_click_callbacks[mouse_action.x][mouse_action.y];
+      tui->cells[_tui_get_cell_index(tui, mouse_action.x, mouse_action.y)].on_click_callback;
   if (callback != NULL) {
     callback(mouse_action);
   }
@@ -433,6 +408,8 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder) {
 
     _tui_draw_cells_to_terminal(tui);
     tui_delete_widget(root_widget);
+    tui_move_to(30, 30);
+    printf("%ld",clock()-start);
     tui_restore_cursor();
     if (handle_input(tui)) {
       return;
@@ -522,10 +499,7 @@ COLUMN_METADATA *_tui_make_column_metadata(WIDGET_ARRAY *children) {
 
 void _tui_delete_column(WIDGET *column) {
   COLUMN_METADATA *metadata = column->metadata;
-  for (size_t i = 0; i < metadata->children->size; ++i) {
-    tui_delete_widget(metadata->children->widgets[i]);
-  }
-  free(metadata->children);
+  _tui_delete_widget_array(metadata->children);
   free(column->metadata);
 }
 
@@ -541,10 +515,7 @@ ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *children) {
 
 void _tui_delete_row(WIDGET *row) {
   ROW_METADATA *metadata = row->metadata;
-  for (size_t i = 0; i < metadata->children->size; ++i) {
-    tui_delete_widget(metadata->children->widgets[i]);
-  }
-  free(metadata->children);
+  _tui_delete_widget_array(metadata->children);
   free(row->metadata);
 }
 
@@ -584,4 +555,12 @@ WIDGET_ARRAY *tui_make_widget_array(int size, ...) {
   widget_array->size = size;
 
   return widget_array;
+}
+
+void _tui_delete_widget_array(WIDGET_ARRAY *widget_array){
+  for (size_t i = 0; i < widget_array->size; ++i) {
+    tui_delete_widget(widget_array->widgets[i]);
+  }
+  free(widget_array->widgets);
+  free(widget_array);
 }
