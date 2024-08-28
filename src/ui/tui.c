@@ -181,11 +181,11 @@ int tui_change_terminal_background_color(COLOR color) {
   return printf("\033[%dm", color + 40);
 }
 
-int handle_input(TUI *tui) {
+bool handle_input(TUI *tui) {
   unsigned char buff[6];
   read(STDIN_FILENO, &buff, 1);
   if (buff[0] == 3) { // User pressd Ctr+C
-    return 1;
+    return true;
   } else if (buff[0] == '\x1B') { // [ESCAPE]
     // TODO: fix for inputting actual <ESC>
     read(STDIN_FILENO, &buff, 5);
@@ -215,15 +215,8 @@ int handle_input(TUI *tui) {
     case 'l':
       tui_move_right(1);
       break;
-    case 'c':
-      tui_clear_screen();
-      break;
-    case 's':
-      tui_save_cursor();
-      break;
-    case 'r':
-      tui_restore_cursor();
-      break;
+      case 'q':
+      return true;
     case '\b':
     case 127: // back space
       tui_delete_before();
@@ -233,7 +226,7 @@ int handle_input(TUI *tui) {
       break;
     }
   }
-  return 0;
+  return false;
 }
 
 void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder) {
