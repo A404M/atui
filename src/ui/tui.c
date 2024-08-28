@@ -133,11 +133,17 @@ void _tui_set_cell_char(TUI *tui, int x, int y, char c) {
 }
 
 void _tui_set_cell_color(TUI *tui, int x, int y, COLOR color) {
+  if (color == COLOR_NO_COLOR) {
+    return;
+  }
   tui->cells[_tui_get_cell_index(tui, x, y)].color = color;
 }
 
 void _tui_set_cell_background_color(TUI *tui, int x, int y,
                                     COLOR background_color) {
+  if (background_color == COLOR_NO_COLOR) {
+    return;
+  }
   tui->cells[_tui_get_cell_index(tui, x, y)].background_color =
       background_color;
 }
@@ -240,30 +246,35 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
   switch (widget->type) {
   case WIDGET_TYPE_TEXT: {
     const TEXT_METADATA *metadata = widget->metadata;
-    const int widthDiff = width_end - width_begin;
-    const int textLen = strlen(metadata->text);
+    const int width_diff = width_end - width_begin;
+    const int text_len = strlen(metadata->text);
+    int inserted_index = 0;
     int height = height_begin;
     for (; height < height_end; ++height) {
-      const int begin = (height - height_begin) * widthDiff;
-      const int end = begin + widthDiff;
+      const int begin = (height - height_begin) * width_diff;
 
-      for (int j = 0; j < end; ++j) {
+      for (int j = 0; j < width_diff; ++j) {
         const int x = width_begin + j;
         const int y = height;
         _tui_set_cell_color(tui, x, y, metadata->color);
-        const int index = begin + j;
-        if (index < textLen) {
-          _tui_set_cell_char(tui, x, y, metadata->text[index]);
+        if (inserted_index < text_len) {
+          const char c = metadata->text[inserted_index];
+          inserted_index += 1;
+          if (c == '\n') {
+            break;
+          } else {
+            _tui_set_cell_char(tui, x, y, c);
+          }
+          if (inserted_index == text_len) {
+            goto END_OF_TEXT;
+          }
         }
       }
-
-      if (end > textLen) {
-        break;
-      }
     }
+  END_OF_TEXT:
     *child_height = height + 1;
     *child_width =
-        (textLen > widthDiff ? width_end : textLen + width_begin) + 1;
+        (text_len > width_diff ? width_end : text_len + width_begin) + 1;
   } break;
   case WIDGET_TYPE_BUTTON: {
     const BUTTON_METADATA *metadata = widget->metadata;

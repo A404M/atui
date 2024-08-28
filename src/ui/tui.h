@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <stdint.h>
 
 typedef enum MOUSE_BUTTON {
   MOUSE_BUTTON_LEFT_CLICK = 32,
@@ -22,7 +23,7 @@ typedef struct MOUSE_ACTION {
 typedef void (*ON_CLICK_CALLBACK)(MOUSE_ACTION mouse_action);
 
 #ifndef __cplusplus
-typedef enum bool { false = 0, true = 1 } bool;
+typedef enum bool : uint8_t { false = 0, true = 1 } bool;
 #endif
 
 typedef enum COLOR {
