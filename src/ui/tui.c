@@ -29,11 +29,32 @@ void _tui_delete_callbacks(TUI *tui, int width) {
   free(tui->on_click_callbacks);
 }
 
+void _tui_clear_cells(TUI *tui) {
+  const TERMINAL_CELL empty = {.c = ' ',
+                               .color = COLOR_NO_COLOR,
+                               .background_color = COLOR_NO_COLOR,
+                               .on_click_callback = NULL};
+  for (int i = 0; i < tui->cells_length; ++i) {
+    tui->cells[i] = empty;
+  }
+}
+
+void _tui_init_cells(TUI *tui) {
+  tui->cells_length = tui_get_width(tui) * tui_get_height(tui);
+  tui->cells = malloc(tui->cells_length * sizeof(TERMINAL_CELL));
+  _tui_clear_cells(tui);
+}
+
+void _tui_delete_cells(TUI *tui) {
+  tui->cells_length = 0;
+  free(tui->cells);
+  tui->cells = NULL;
+}
+
 TUI *tui_init() {
   setbuf(stdout, NULL);
 
   TUI *tui = malloc(sizeof(TUI));
-  tui->buffer = malloc(0);
 
   tui_get_cursor_pos(tui, &tui->init_cursor_x, &tui->init_cursor_y);
 
@@ -52,6 +73,7 @@ TUI *tui_init() {
   write(STDOUT_FILENO, "\e[?9h", 5);
 
   _tui_init_callbacks(tui);
+  _tui_init_cells(tui);
 
   tui_refresh(tui);
   return tui;
@@ -81,7 +103,9 @@ void tui_refresh(TUI *tui) {
     return;
   }
   _tui_delete_callbacks(tui, width);
+  _tui_delete_cells(tui);
   _tui_init_callbacks(tui);
+  _tui_init_cells(tui);
 }
 
 int tui_get_width(TUI *tui) { return tui->size.ws_col; }
@@ -125,9 +149,29 @@ int tui_delete_before() { return printf("\b \b"); }
 
 int tui_delete_under_cursor() { return printf(" \b"); }
 
-void tui_set_on_click_callback(TUI *tui, int x, int y,
-                               ON_CLICK_CALLBACK callback) {
-  tui->on_click_callbacks[x][y] = callback;
+int _tui_get_cell_index(TUI *tui, int x, int y) {
+  const int width = tui_get_width(tui);
+  return x + width * y;
+}
+
+void _tui_set_cell_char(TUI *tui, int x, int y, char c) {
+  tui->cells[_tui_get_cell_index(tui, x, y)].c = c;
+}
+
+void _tui_set_cell_color(TUI *tui, int x, int y, COLOR color) {
+  tui->cells[_tui_get_cell_index(tui, x, y)].color = color;
+}
+
+void _tui_set_cell_background_color(TUI *tui, int x, int y,
+                                    COLOR background_color) {
+  tui->cells[_tui_get_cell_index(tui, x, y)].background_color =
+      background_color;
+}
+
+void _tui_set_cell_on_click_callback(TUI *tui, int x, int y,
+                                     ON_CLICK_CALLBACK on_click_callback) {
+  tui->cells[_tui_get_cell_index(tui, x, y)].on_click_callback =
+      on_click_callback;
 }
 
 void tui_handle_mouse_action(TUI *tui, MOUSE_ACTION mouse_action) {
@@ -215,9 +259,9 @@ void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder) {
   tui_main_loop(tui, widget_builder);
 }
 
-void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
-                      int width_end, int height_begin, int height_end,
-                      COLOR parent_color, int *child_width, int *child_height) {
+void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
+                               int width_end, int height_begin, int height_end,
+                               int *child_width, int *child_height) {
   switch (widget->type) {
   case WIDGET_TYPE_TEXT: {
     const TEXT_METADATA *metadata = widget->metadata;
@@ -225,21 +269,20 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
     const int textLen = strlen(metadata->text);
     int height = height_begin;
     for (; height < height_end; ++height) {
-      tui_move_to(width_begin, height);
       const int begin = (height - height_begin) * widthDiff;
-      int end = begin + widthDiff;
-      int shouldExit = 0;
-      if (end > textLen) {
-        end = textLen;
-        shouldExit = 1;
+      const int end = begin + widthDiff;
+
+      for (int j = 0; j < end; ++j) {
+        const int x = width_begin + j;
+        const int y = height;
+        _tui_set_cell_color(tui, x, y, metadata->color);
+        const int index = begin + j;
+        if (index < textLen) {
+          _tui_set_cell_char(tui, x, y, metadata->text[index]);
+        }
       }
 
-      tui_change_terminal_text_color(metadata->color);
-      tui_change_terminal_background_color(parent_color);
-      write(STDOUT_FILENO, metadata->text + begin, end - begin);
-      tui_change_terminal_background_color(COLOR_RESET);
-      tui_change_terminal_text_color(COLOR_RESET);
-      if (shouldExit) {
+      if (end > textLen) {
         break;
       }
     }
@@ -249,16 +292,13 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
   } break;
   case WIDGET_TYPE_BUTTON: {
     const BUTTON_METADATA *metadata = widget->metadata;
-    tui_move_to(width_begin, height_begin);
     if (metadata->child != NULL) {
-      _tui_draw_widget(tui, metadata->child, width_begin, width_end,
-                       height_begin, height_end, parent_color, child_width,
-                       child_height);
-      /*printf("%d,%d\n\r",*child_width,*child_height);*/
-      /*sleep(1);*/
+      _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
+                                height_begin, height_end, child_width,
+                                child_height);
       for (int i = width_begin; i < *child_width; ++i) {
         for (int j = height_begin; j < *child_height; ++j) {
-          tui_set_on_click_callback(tui, i, j, metadata->callback);
+          _tui_set_cell_on_click_callback(tui, i, j, metadata->callback);
         }
       }
     }
@@ -270,8 +310,9 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
     for (int i = 0; i < metadata->children->size; ++i) {
       const WIDGET *child = metadata->children->widgets[i];
       int width_temp;
-      _tui_draw_widget(tui, child, width_begin, width_end, *child_height,
-                       height_end, parent_color, &width_temp, child_height);
+      _tui_draw_widget_to_cells(tui, child, width_begin, width_end,
+                                *child_height, height_end, &width_temp,
+                                child_height);
       if (width_temp > *child_width) {
         *child_width = width_temp;
       }
@@ -284,8 +325,9 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
     for (int i = 0; i < metadata->children->size; ++i) {
       const WIDGET *child = metadata->children->widgets[i];
       int height_temp;
-      _tui_draw_widget(tui, child, *child_width, width_end, height_begin,
-                       height_end, parent_color, child_width, &height_temp);
+      _tui_draw_widget_to_cells(tui, child, *child_width, width_end,
+                                height_begin, height_end, child_width,
+                                &height_temp);
       if (height_temp > *child_height) {
         *child_height = height_temp;
       }
@@ -306,18 +348,15 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
     }
 
     for (int y = height_begin; y < height_end; ++y) {
-      tui_move_to(width_begin, y);
       for (int x = width_begin; x < width_end; ++x) {
-        tui_change_terminal_background_color(metadata->color);
-        write(STDOUT_FILENO, " ", 1);
-        tui_change_terminal_background_color(COLOR_RESET);
+        _tui_set_cell_background_color(tui, x, y, metadata->color);
       }
     }
 
     if (metadata->child != NULL) {
       int t0, t1;
-      _tui_draw_widget(tui, metadata->child, width_begin, width_end,
-                       height_begin, height_end, metadata->color, &t0, &t1);
+      _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
+                                height_begin, height_end, &t0, &t1);
     }
     *child_width = width_end;
     *child_height = height_end;
@@ -329,21 +368,71 @@ void _tui_draw_widget(TUI *tui, const WIDGET *widget, int width_begin,
   }
 }
 
+int _tui_get_background_color_ascii(COLOR color) {
+  if (color == COLOR_NO_COLOR) {
+    return 0;
+  } else if (color == COLOR_RESET) {
+    return printf("\033[%dm", COLOR_RESET);
+  }
+  return printf("\033[%dm", color + 40);
+}
+
+void _tui_draw_cells_to_terminal(TUI *tui) {
+  const size_t size_of_cell = 5 + 5 + sizeof(char) + 5;
+  const size_t size = tui->cells_length * (size_of_cell);
+  char str[(size + 1) * sizeof(char)];
+  str[0] = '\0';
+  char cell_str[5];
+
+  COLOR last_color = COLOR_NO_COLOR;
+  COLOR last_background_color = COLOR_NO_COLOR;
+
+  for (int i = 0; i < tui->cells_length; ++i) {
+    const TERMINAL_CELL cell = tui->cells[i];
+
+    if (last_color != cell.color ||
+        last_background_color != cell.background_color) {
+      sprintf(cell_str, "\033[%dm", COLOR_RESET);
+      strcat(str, cell_str);
+      last_color = cell.color; // TODO: run to know what to fix
+      last_background_color = cell.background_color;
+      if (cell.color == COLOR_RESET || cell.color == COLOR_NO_COLOR) {
+        sprintf(cell_str, "\033[%dm", COLOR_RESET);
+      } else {
+        sprintf(cell_str, "\033[%dm", cell.color + 30);
+      }
+      strcat(str, cell_str);
+
+      if (cell.background_color == COLOR_RESET ||
+          cell.background_color == COLOR_NO_COLOR) {
+        sprintf(cell_str, "\033[%dm", COLOR_RESET);
+      } else {
+        sprintf(cell_str, "\033[%dm", cell.background_color + 40);
+      }
+      strcat(str, cell_str);
+    }
+    strncat(str, &cell.c, 1);
+  }
+  const int len = strlen(str);
+
+  tui_move_to(0, 0);
+  write(STDOUT_FILENO, str, len);
+}
+
 void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder) {
   while (1) {
     clock_t start = clock();
     tui_refresh(tui);
-    tui_save_cursor();
-    tui_clear_screen();
     WIDGET *root_widget = widget_builder(tui);
+    tui_save_cursor();
+    _tui_clear_cells(tui);
 
     int width, height;
-    _tui_draw_widget(tui, root_widget, 0, tui_get_width(tui), 0,
-                     tui_get_height(tui), COLOR_NO_COLOR, &width, &height);
+    _tui_draw_widget_to_cells(tui, root_widget, 0, tui_get_width(tui), 0,
+                              tui_get_height(tui), &width, &height);
 
+    _tui_draw_cells_to_terminal(tui);
     tui_delete_widget(root_widget);
-    tui_move_to(30, 30);
-    printf("time:%ld",clock()-start);
     tui_restore_cursor();
     if (handle_input(tui)) {
       return;
@@ -359,6 +448,9 @@ WIDGET *tui_new_widget(WIDGET_TYPE type, void *metadata) {
 }
 
 void tui_delete_widget(WIDGET *widget) {
+  if (widget == NULL) {
+    return;
+  }
   switch (widget->type) {
   case WIDGET_TYPE_TEXT:
     _tui_delete_text(widget);
@@ -438,8 +530,7 @@ void _tui_delete_column(WIDGET *column) {
 }
 
 WIDGET *tui_make_row(WIDGET_ARRAY *children) {
-  return tui_new_widget(WIDGET_TYPE_ROW,
-                        _tui_make_row_metadata(children));
+  return tui_new_widget(WIDGET_TYPE_ROW, _tui_make_row_metadata(children));
 }
 
 ROW_METADATA *_tui_make_row_metadata(WIDGET_ARRAY *children) {
@@ -477,14 +568,14 @@ void _tui_delete_box(WIDGET *box) {
   free(box->metadata);
 }
 
-WIDGET_ARRAY *tui_make_widget_array(int size,...){
+WIDGET_ARRAY *tui_make_widget_array(int size, ...) {
   va_list arg_pointer;
   va_start(arg_pointer, size);
 
-  WIDGET **widgets = malloc(size*sizeof(WIDGET**));
+  WIDGET **widgets = malloc(size * sizeof(WIDGET **));
 
-  for(int i = 0;i < size;++i){
-    widgets[i] = va_arg(arg_pointer,WIDGET*);
+  for (int i = 0; i < size; ++i) {
+    widgets[i] = va_arg(arg_pointer, WIDGET *);
   }
   va_end(arg_pointer);
 

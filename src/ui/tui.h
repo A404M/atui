@@ -21,12 +21,36 @@ typedef struct MOUSE_ACTION {
 
 typedef void (*ON_CLICK_CALLBACK)(MOUSE_ACTION mouse_action);
 
+#ifndef __cplusplus
+typedef enum bool { false = 0, true = 1 } bool;
+#endif
+
+typedef enum COLOR {
+  COLOR_NO_COLOR = -1,
+  COLOR_RESET = 0,
+  COLOR_RED = 1,
+  COLOR_GREEN = 2,
+  COLOR_YELLOW = 3,
+  COLOR_BLUE = 4,
+  COLOR_MAGENTA = 5,
+  COLOR_CYAN = 6,
+  COLOR_WHITE = 7
+} COLOR;
+
+typedef struct TERMINAL_CELL {
+  char c;
+  COLOR color;
+  COLOR background_color;
+  ON_CLICK_CALLBACK on_click_callback;
+} TERMINAL_CELL;
+
 typedef struct TUI {
   struct winsize size;
   struct termios original, raw, helper;
   ON_CLICK_CALLBACK **on_click_callbacks;
   int init_cursor_x, init_cursor_y;
-  char *buffer;
+  TERMINAL_CELL *cells;
+  size_t cells_length;
 } TUI;
 
 typedef enum WIDGET_TYPE {
@@ -42,20 +66,8 @@ typedef struct WIDGET {
   void *metadata;
 } WIDGET;
 
-typedef enum COLOR {
-  COLOR_NO_COLOR = -1,
-  COLOR_RESET = 0,
-  COLOR_RED = 1,
-  COLOR_GREEN = 2,
-  COLOR_YELLOW = 3,
-  COLOR_BLUE = 4,
-  COLOR_MAGENTA = 5,
-  COLOR_CYAN = 6,
-  COLOR_WHITE = 7
-} COLOR;
-
 typedef struct WIDGET_ARRAY {
-  int size;
+  size_t size;
   WIDGET **widgets;
 } WIDGET_ARRAY;
 
@@ -99,10 +111,9 @@ extern int tui_move_to(int x, int y);
 extern int tui_clear_screen();
 
 extern void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder);
-extern void _tui_draw_widget(TUI *tui, const WIDGET *widget, int widthBegin,
-                             int widthEnd, int heightBegin, int heightEnd,
-                             COLOR parent_color, int *childWidth,
-                             int *childHeight);
+extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
+                             int width_end, int height_begin, int height_end,
+                             int *child_width, int *childHeight);
 extern void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder);
 
 extern WIDGET *tui_new_widget(WIDGET_TYPE type, void *metadata);
