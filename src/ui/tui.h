@@ -12,6 +12,8 @@ extern const int MAX_HEIGHT;
 extern const int MIN_WIDTH;
 extern const int MIN_HEIGHT;
 
+extern const int FRAME_UNLIMITED;
+
 typedef enum MOUSE_BUTTON {
   MOUSE_BUTTON_LEFT_CLICK = 32,
   MOUSE_BUTTON_MIDDLE_CLICK = 33,

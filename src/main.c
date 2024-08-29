@@ -23,7 +23,6 @@ WIDGET *ui_build(TUI *tui) {
                         tui_make_text("This is the second page", COLOR_BLUE),
                         tui_make_button(tui_make_text("       Back", COLOR_RED),
                                         on_button_click))),
-
                     COLOR_WHITE))))),
         COLOR_MAGENTA);
   } else {
@@ -34,8 +33,8 @@ WIDGET *ui_build(TUI *tui) {
             tui_make_row(tui_make_widget_array(
                 tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
                 tui_make_button(
-                    tui_make_box(16, 3,
-                                 tui_make_text("\nClick here", COLOR_BLUE),
+                    tui_make_box(MIN_WIDTH, MIN_HEIGHT,
+                                 tui_make_text("\nClick here\n", COLOR_BLUE),
                                  COLOR_WHITE),
                     on_button_click))))),
         COLOR_MAGENTA);

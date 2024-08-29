@@ -14,6 +14,8 @@ const int MAX_HEIGHT = -1;
 const int MIN_WIDTH = -2;
 const int MIN_HEIGHT = -2;
 
+const int FRAME_UNLIMITED = 0;
+
 void _tui_clear_cells(TUI *tui) {
   const TERMINAL_CELL empty = {.c = ' ',
                                .color = COLOR_NO_COLOR,
@@ -153,6 +155,17 @@ void _tui_set_cell_background_color(TUI *tui, int x, int y,
       background_color;
 }
 
+void _tui_set_cell_background_color_if_not_set(TUI *tui, int x, int y,
+                                               COLOR background_color) {
+  if (background_color == COLOR_NO_COLOR) {
+    return;
+  }
+  TERMINAL_CELL *cell = &tui->cells[_tui_get_cell_index(tui, x, y)];
+  if (cell->background_color == COLOR_NO_COLOR) {
+    cell->background_color = background_color;
+  }
+}
+
 void _tui_set_cell_on_click_callback(TUI *tui, int x, int y,
                                      ON_CLICK_CALLBACK on_click_callback) {
   tui->cells[_tui_get_cell_index(tui, x, y)].on_click_callback =
@@ -259,29 +272,34 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
       const size_t text_len = strlen(metadata->text);
       size_t inserted_index = 0;
       int height = height_begin;
+      int max_width = width_begin;
       for (; height < height_end; ++height) {
         for (int j = 0; j < width_diff; ++j) {
-          const int x = width_begin + j;
-          const int y = height;
-          _tui_set_cell_color(tui, x, y, metadata->color);
+        START_OF_HORIZONTAL_LOOP:
           if (inserted_index < text_len) {
+            const int x = width_begin + j;
+            const int y = height;
             const char c = metadata->text[inserted_index];
             inserted_index += 1;
             if (c == '\n') {
-              break;
+              height += 1;
+              j = 0;
+              goto START_OF_HORIZONTAL_LOOP;
             } else {
+              if (max_width < x) {
+                max_width = x;
+              }
+              _tui_set_cell_color(tui, x, y, metadata->color);
               _tui_set_cell_char(tui, x, y, c);
             }
-            if (inserted_index == text_len) {
-              goto END_OF_TEXT;
-            }
+          } else {
+            goto END_OF_TEXT;
           }
         }
       }
     END_OF_TEXT:
       *child_height = height + 1;
-      *child_width =
-          (text_len > width_diff ? width_end : text_len + width_begin) + 1;
+      *child_width = max_width + 1;
     } break;
     case WIDGET_TYPE_BUTTON: {
       const BUTTON_METADATA *metadata = widget->metadata;
@@ -329,28 +347,36 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
     case WIDGET_TYPE_BOX: {
       const BOX_METADATA *metadata = widget->metadata;
 
-      if (metadata->width != MAX_WIDTH) {
+      if (metadata->width != MIN_WIDTH && metadata->width != MAX_WIDTH) {
         width_end = metadata->width + width_begin >= width_end
                         ? width_end
                         : metadata->width + width_begin;
       }
-      if (metadata->height != MAX_HEIGHT) {
+      if (metadata->height != MIN_HEIGHT && metadata->height != MAX_HEIGHT) {
         height_end = metadata->height + height_begin >= height_end
                          ? height_end
                          : metadata->height + height_begin;
       }
 
-      for (int y = height_begin; y < height_end; ++y) {
-        for (int x = width_begin; x < width_end; ++x) {
-          _tui_set_cell_background_color(tui, x, y, metadata->color);
+      if (metadata->child != NULL) {
+        int temp_width, temp_height;
+        _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
+                                  height_begin, height_end, &temp_width,
+                                  &temp_height);
+        if (metadata->width == MIN_WIDTH) {
+          width_end = temp_width;
+        }
+        if (metadata->height == MIN_HEIGHT) {
+          height_end = temp_height;
         }
       }
 
-      if (metadata->child != NULL) {
-        int t0, t1;
-        _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
-                                  height_begin, height_end, &t0, &t1);
+      for (int y = height_begin; y < height_end; ++y) {
+        for (int x = width_begin; x < width_end; ++x) {
+          _tui_set_cell_background_color_if_not_set(tui, x, y, metadata->color);
+        }
       }
+
       *child_width = width_end;
       *child_height = height_end;
     } break;
@@ -500,7 +526,8 @@ long int nano_time() {
 }
 
 void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
-  const long int frame_nano = NANO_TO_SECOND / fps;
+  const long int frame_nano =
+      (fps == FRAME_UNLIMITED) ? 0 : NANO_TO_SECOND / fps;
   while (1) {
     const long int start = nano_time();
     tui_save_cursor();
@@ -517,7 +544,7 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
     /*tui_move_to(0, 0);*/
     /*printf("%ld\t%ld", last_frame_time, frame_nano);*/
     tui_restore_cursor();
-    if (fps != -1) {
+    if (fps != FRAME_UNLIMITED) {
       const long int diff = nano_time() - start;
       nano_sleep(frame_nano - diff);
     }
