@@ -9,4 +9,4 @@ if [ ! -d build ]; then
 	fi
 fi
 
-gcc -Wall -Wextra -O3 src/main.c src/ui/tui.c -o "build/$project_name"
+gcc -Wall -Wextra -O3 -std=gnu23 src/main.c src/ui/tui.c -o "build/$project_name"

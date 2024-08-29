@@ -28,8 +28,11 @@ typedef struct MOUSE_ACTION {
 
 typedef void (*ON_CLICK_CALLBACK)(const MOUSE_ACTION *mouse_action);
 
+
 #ifndef __cplusplus
+#if (__STDC_VERSION__ < 202000L)
 typedef enum bool : uint8_t { false = 0, true = 1 } bool;
+#endif
 #endif
 
 typedef enum COLOR {

@@ -1,4 +1,5 @@
 #include "tui.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -188,57 +189,57 @@ int tui_change_terminal_background_color(COLOR color) {
 bool handle_input(TUI *tui) {
   unsigned char buff[6];
   read(STDIN_FILENO, &buff, 1);
-  if (buff[0] == 3) { // User pressd Ctr+C
+  if (buff[0] == 3) {  // User pressd Ctr+C
     return true;
-  } else if (buff[0] == '\x1B') { // [ESCAPE]
+  } else if (buff[0] == '\x1B') {  // [ESCAPE]
     // TODO: fix for inputting actual <ESC>
     read(STDIN_FILENO, &buff, 5);
     switch (buff[1]) {
-    case 77: {
-      const MOUSE_ACTION mouse_action = {
-          .button = buff[2],
-          .x = buff[3] - 32 - 1, // starts at 0
-          .y = buff[4] - 32 - 1, // starts at 0
-      };
-      tui_handle_mouse_action(tui, &mouse_action);
-      /*printf("button:%u\n\rx:%u\n\ry:%u\n\n\r", mouse_action.button,*/
-      /*       mouse_action.x, mouse_action.y);*/
-    } break;
+      case 77: {
+        const MOUSE_ACTION mouse_action = {
+            .button = buff[2],
+            .x = buff[3] - 32 - 1,  // starts at 0
+            .y = buff[4] - 32 - 1,  // starts at 0
+        };
+        tui_handle_mouse_action(tui, &mouse_action);
+        /*printf("button:%u\n\rx:%u\n\ry:%u\n\n\r", mouse_action.button,*/
+        /*       mouse_action.x, mouse_action.y);*/
+      } break;
     }
   } else {
     switch (buff[0]) {
-    case 'h':
-      tui_move_left(1);
-      break;
-    case 'j':
-      tui_move_up(1);
-      break;
-    case 'k':
-      tui_move_top(1);
-      break;
-    case 'l':
-      tui_move_right(1);
-      break;
-    case 'q':
-      return true;
-    case '\r': { // <ENTER>
-      int x, y;
-      tui_get_cursor_pos(tui, &x, &y);
-      const MOUSE_ACTION mouse_action = {
-          .button = MOUSE_BUTTON_LEFT_CLICK,
-          .x = x,
-          .y = y,
-      };
-      tui_handle_mouse_action(tui, &mouse_action);
-    } break;
-    case '\b':
-    case 127: // back space
-      tui_delete_before();
-      break;
-    default:
-      /*printf("unknown:%c,%d\n\r", buff[0], buff[0]);*/
-      /*sleep(1);*/
-      break;
+      case 'h':
+        tui_move_left(1);
+        break;
+      case 'j':
+        tui_move_up(1);
+        break;
+      case 'k':
+        tui_move_top(1);
+        break;
+      case 'l':
+        tui_move_right(1);
+        break;
+      case 'q':
+        return true;
+      case '\r': {  // <ENTER>
+        int x, y;
+        tui_get_cursor_pos(tui, &x, &y);
+        const MOUSE_ACTION mouse_action = {
+            .button = MOUSE_BUTTON_LEFT_CLICK,
+            .x = x,
+            .y = y,
+        };
+        tui_handle_mouse_action(tui, &mouse_action);
+      } break;
+      case '\b':
+      case 127:  // back space
+        tui_delete_before();
+        break;
+      default:
+        /*printf("unknown:%c,%d\n\r", buff[0], buff[0]);*/
+        /*sleep(1);*/
+        break;
     }
   }
   return false;
@@ -252,111 +253,111 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
                                int width_end, int height_begin, int height_end,
                                int *child_width, int *child_height) {
   switch (widget->type) {
-  case WIDGET_TYPE_TEXT: {
-    const TEXT_METADATA *metadata = widget->metadata;
-    const int width_diff = width_end - width_begin;
-    const size_t text_len = strlen(metadata->text);
-    size_t inserted_index = 0;
-    int height = height_begin;
-    for (; height < height_end; ++height) {
-      for (int j = 0; j < width_diff; ++j) {
-        const int x = width_begin + j;
-        const int y = height;
-        _tui_set_cell_color(tui, x, y, metadata->color);
-        if (inserted_index < text_len) {
-          const char c = metadata->text[inserted_index];
-          inserted_index += 1;
-          if (c == '\n') {
-            break;
-          } else {
-            _tui_set_cell_char(tui, x, y, c);
-          }
-          if (inserted_index == text_len) {
-            goto END_OF_TEXT;
+    case WIDGET_TYPE_TEXT: {
+      const TEXT_METADATA *metadata = widget->metadata;
+      const int width_diff = width_end - width_begin;
+      const size_t text_len = strlen(metadata->text);
+      size_t inserted_index = 0;
+      int height = height_begin;
+      for (; height < height_end; ++height) {
+        for (int j = 0; j < width_diff; ++j) {
+          const int x = width_begin + j;
+          const int y = height;
+          _tui_set_cell_color(tui, x, y, metadata->color);
+          if (inserted_index < text_len) {
+            const char c = metadata->text[inserted_index];
+            inserted_index += 1;
+            if (c == '\n') {
+              break;
+            } else {
+              _tui_set_cell_char(tui, x, y, c);
+            }
+            if (inserted_index == text_len) {
+              goto END_OF_TEXT;
+            }
           }
         }
       }
-    }
-  END_OF_TEXT:
-    *child_height = height + 1;
-    *child_width =
-        (text_len > width_diff ? width_end : text_len + width_begin) + 1;
-  } break;
-  case WIDGET_TYPE_BUTTON: {
-    const BUTTON_METADATA *metadata = widget->metadata;
-    if (metadata->child != NULL) {
-      _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
-                                height_begin, height_end, child_width,
-                                child_height);
-      for (int i = width_begin; i < *child_width; ++i) {
-        for (int j = height_begin; j < *child_height; ++j) {
-          _tui_set_cell_on_click_callback(tui, i, j, metadata->callback);
+    END_OF_TEXT:
+      *child_height = height + 1;
+      *child_width =
+          (text_len > width_diff ? width_end : text_len + width_begin) + 1;
+    } break;
+    case WIDGET_TYPE_BUTTON: {
+      const BUTTON_METADATA *metadata = widget->metadata;
+      if (metadata->child != NULL) {
+        _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
+                                  height_begin, height_end, child_width,
+                                  child_height);
+        for (int i = width_begin; i < *child_width; ++i) {
+          for (int j = height_begin; j < *child_height; ++j) {
+            _tui_set_cell_on_click_callback(tui, i, j, metadata->callback);
+          }
         }
       }
-    }
-  } break;
-  case WIDGET_TYPE_COLUMN: {
-    const COLUMN_METADATA *metadata = widget->metadata;
-    *child_width = width_begin;
-    *child_height = height_begin;
-    for (size_t i = 0; i < metadata->children->size; ++i) {
-      const WIDGET *child = metadata->children->widgets[i];
-      int width_temp;
-      _tui_draw_widget_to_cells(tui, child, width_begin, width_end,
-                                *child_height, height_end, &width_temp,
-                                child_height);
-      if (width_temp > *child_width) {
-        *child_width = width_temp;
+    } break;
+    case WIDGET_TYPE_COLUMN: {
+      const COLUMN_METADATA *metadata = widget->metadata;
+      *child_width = width_begin;
+      *child_height = height_begin;
+      for (size_t i = 0; i < metadata->children->size; ++i) {
+        const WIDGET *child = metadata->children->widgets[i];
+        int width_temp;
+        _tui_draw_widget_to_cells(tui, child, width_begin, width_end,
+                                  *child_height, height_end, &width_temp,
+                                  child_height);
+        if (width_temp > *child_width) {
+          *child_width = width_temp;
+        }
       }
-    }
-  } break;
-  case WIDGET_TYPE_ROW: {
-    const ROW_METADATA *metadata = widget->metadata;
-    *child_width = width_begin;
-    *child_height = height_begin;
-    for (size_t i = 0; i < metadata->children->size; ++i) {
-      const WIDGET *child = metadata->children->widgets[i];
-      int height_temp;
-      _tui_draw_widget_to_cells(tui, child, *child_width, width_end,
-                                height_begin, height_end, child_width,
-                                &height_temp);
-      if (height_temp > *child_height) {
-        *child_height = height_temp;
+    } break;
+    case WIDGET_TYPE_ROW: {
+      const ROW_METADATA *metadata = widget->metadata;
+      *child_width = width_begin;
+      *child_height = height_begin;
+      for (size_t i = 0; i < metadata->children->size; ++i) {
+        const WIDGET *child = metadata->children->widgets[i];
+        int height_temp;
+        _tui_draw_widget_to_cells(tui, child, *child_width, width_end,
+                                  height_begin, height_end, child_width,
+                                  &height_temp);
+        if (height_temp > *child_height) {
+          *child_height = height_temp;
+        }
       }
-    }
-  } break;
-  case WIDGET_TYPE_BOX: {
-    const BOX_METADATA *metadata = widget->metadata;
+    } break;
+    case WIDGET_TYPE_BOX: {
+      const BOX_METADATA *metadata = widget->metadata;
 
-    if (metadata->width != MAX_WIDTH) {
-      width_end = metadata->width + width_begin >= width_end
-                      ? width_end
-                      : metadata->width + width_begin;
-    }
-    if (metadata->height != MAX_HEIGHT) {
-      height_end = metadata->height + height_begin >= height_end
-                       ? height_end
-                       : metadata->height + height_begin;
-    }
-
-    for (int y = height_begin; y < height_end; ++y) {
-      for (int x = width_begin; x < width_end; ++x) {
-        _tui_set_cell_background_color(tui, x, y, metadata->color);
+      if (metadata->width != MAX_WIDTH) {
+        width_end = metadata->width + width_begin >= width_end
+                        ? width_end
+                        : metadata->width + width_begin;
       }
-    }
+      if (metadata->height != MAX_HEIGHT) {
+        height_end = metadata->height + height_begin >= height_end
+                         ? height_end
+                         : metadata->height + height_begin;
+      }
 
-    if (metadata->child != NULL) {
-      int t0, t1;
-      _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
-                                height_begin, height_end, &t0, &t1);
-    }
-    *child_width = width_end;
-    *child_height = height_end;
-  } break;
-  default:
-    fprintf(stderr, "widget type '%d' went wrong in _tui_draw_widget",
-            widget->type);
-    exit(1);
+      for (int y = height_begin; y < height_end; ++y) {
+        for (int x = width_begin; x < width_end; ++x) {
+          _tui_set_cell_background_color(tui, x, y, metadata->color);
+        }
+      }
+
+      if (metadata->child != NULL) {
+        int t0, t1;
+        _tui_draw_widget_to_cells(tui, metadata->child, width_begin, width_end,
+                                  height_begin, height_end, &t0, &t1);
+      }
+      *child_width = width_end;
+      *child_height = height_end;
+    } break;
+    default:
+      fprintf(stderr, "widget type '%d' went wrong in _tui_draw_widget",
+              widget->type);
+      exit(1);
   }
 }
 
@@ -424,7 +425,8 @@ int kbhit() {
   return select(1, &fds, NULL, NULL, &tv) > 0;
 }
 
-bool widget_array_eqauls(const WIDGET_ARRAY *restrict left, const WIDGET_ARRAY *restrict right) {
+bool widget_array_eqauls(const WIDGET_ARRAY *restrict left,
+                         const WIDGET_ARRAY *restrict right) {
   if (left->size != right->size) {
     return false;
   }
@@ -445,39 +447,39 @@ bool widget_eqauls(const WIDGET *restrict left, const WIDGET *restrict right) {
   }
 
   switch (left->type) {
-  case WIDGET_TYPE_TEXT: {
-    const TEXT_METADATA *left_data = left->metadata;
-    const TEXT_METADATA *right_data = right->metadata;
-    return left_data->color == right_data->color &&
-           strcmp(left_data->text, right_data->text) == 0;
-  } break;
-  case WIDGET_TYPE_BUTTON: {
-    const BUTTON_METADATA *left_data = left->metadata;
-    const BUTTON_METADATA *right_data = right->metadata;
-    return left_data->callback == right_data->callback &&
-           widget_eqauls(left_data->child, right_data->child);
-  } break;
-  case WIDGET_TYPE_COLUMN: {
-    const COLUMN_METADATA *left_data = left->metadata;
-    const COLUMN_METADATA *right_data = right->metadata;
-    return widget_array_eqauls(left_data->children, right_data->children);
-  } break;
-  case WIDGET_TYPE_ROW: {
-    const ROW_METADATA *left_data = left->metadata;
-    const ROW_METADATA *right_data = right->metadata;
-    return widget_array_eqauls(left_data->children, right_data->children);
-  } break;
-  case WIDGET_TYPE_BOX: {
-    const BOX_METADATA *left_data = left->metadata;
-    const BOX_METADATA *right_data = right->metadata;
-    return left_data->width == right_data->width &&
-           left_data->height == right_data->height &&
-           left_data->color == right_data->color &&
-           widget_eqauls(left_data->child, right_data->child);
-  } break;
-  default:
-    fprintf(stderr, "Type error '%d' in tui_delete_widget\n", left->type);
-    exit(1);
+    case WIDGET_TYPE_TEXT: {
+      const TEXT_METADATA *left_data = left->metadata;
+      const TEXT_METADATA *right_data = right->metadata;
+      return left_data->color == right_data->color &&
+             strcmp(left_data->text, right_data->text) == 0;
+    } break;
+    case WIDGET_TYPE_BUTTON: {
+      const BUTTON_METADATA *left_data = left->metadata;
+      const BUTTON_METADATA *right_data = right->metadata;
+      return left_data->callback == right_data->callback &&
+             widget_eqauls(left_data->child, right_data->child);
+    } break;
+    case WIDGET_TYPE_COLUMN: {
+      const COLUMN_METADATA *left_data = left->metadata;
+      const COLUMN_METADATA *right_data = right->metadata;
+      return widget_array_eqauls(left_data->children, right_data->children);
+    } break;
+    case WIDGET_TYPE_ROW: {
+      const ROW_METADATA *left_data = left->metadata;
+      const ROW_METADATA *right_data = right->metadata;
+      return widget_array_eqauls(left_data->children, right_data->children);
+    } break;
+    case WIDGET_TYPE_BOX: {
+      const BOX_METADATA *left_data = left->metadata;
+      const BOX_METADATA *right_data = right->metadata;
+      return left_data->width == right_data->width &&
+             left_data->height == right_data->height &&
+             left_data->color == right_data->color &&
+             widget_eqauls(left_data->child, right_data->child);
+    } break;
+    default:
+      fprintf(stderr, "Type error '%d' in tui_delete_widget\n", left->type);
+      exit(1);
   }
 
   return true;
@@ -517,7 +519,7 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
     tui_restore_cursor();
     if (fps != -1) {
       const long int diff = nano_time() - start;
-      nano_sleep(frame_nano-diff);
+      nano_sleep(frame_nano - diff);
     }
     if (kbhit()) {
       if (handle_input(tui)) {
@@ -539,24 +541,24 @@ void tui_delete_widget(WIDGET *restrict widget) {
     return;
   }
   switch (widget->type) {
-  case WIDGET_TYPE_TEXT:
-    _tui_delete_text(widget);
-    break;
-  case WIDGET_TYPE_BUTTON:
-    _tui_delete_button(widget);
-    break;
-  case WIDGET_TYPE_COLUMN:
-    _tui_delete_column(widget);
-    break;
-  case WIDGET_TYPE_ROW:
-    _tui_delete_row(widget);
-    break;
-  case WIDGET_TYPE_BOX:
-    _tui_delete_box(widget);
-    break;
-  default:
-    fprintf(stderr, "Type error '%d' in tui_delete_widget\n", widget->type);
-    exit(1);
+    case WIDGET_TYPE_TEXT:
+      _tui_delete_text(widget);
+      break;
+    case WIDGET_TYPE_BUTTON:
+      _tui_delete_button(widget);
+      break;
+    case WIDGET_TYPE_COLUMN:
+      _tui_delete_column(widget);
+      break;
+    case WIDGET_TYPE_ROW:
+      _tui_delete_row(widget);
+      break;
+    case WIDGET_TYPE_BOX:
+      _tui_delete_box(widget);
+      break;
+    default:
+      fprintf(stderr, "Type error '%d' in tui_delete_widget\n", widget->type);
+      exit(1);
   }
   free(widget);
 }

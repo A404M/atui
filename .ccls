@@ -1,12 +1,13 @@
-gcc
-# compiler driver
-
-%c -std=c23
-# %cpp -std=c++23
+clang
+%c -std=c11
+%cpp -std=c++2a
+%h %hpp --include=Global.h
+-Iinc
+-DMACRO
 
 # add this to support `.hpp` files as C++ headers
 # %hpp -x
 # %hpp c++-header
 
-%h -x
-%h c-header
+# %h -x
+# %h c-header
