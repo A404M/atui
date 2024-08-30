@@ -1,6 +1,7 @@
 #include "tui.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -513,10 +514,11 @@ bool widget_eqauls(const WIDGET *restrict left, const WIDGET *restrict right) {
 
 const int NANO_TO_SECOND = 1000000000;
 
-void nano_sleep(long int nano_seconds) {
+int64_t nano_sleep(long int nano_seconds) {
   struct timespec remaining,
       request = {nano_seconds / NANO_TO_SECOND, nano_seconds % NANO_TO_SECOND};
   nanosleep(&request, &remaining);
+  return remaining.tv_sec * NANO_TO_SECOND + remaining.tv_nsec;
 }
 
 long int nano_time() {
@@ -528,6 +530,7 @@ long int nano_time() {
 void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
   const long int frame_nano =
       (fps == FRAME_UNLIMITED) ? 0 : NANO_TO_SECOND / fps;
+  int64_t last_remaining = 0;
   while (1) {
     const long int start = nano_time();
     tui_save_cursor();
@@ -546,8 +549,9 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
     tui_restore_cursor();
     if (fps != FRAME_UNLIMITED) {
       const long int diff = nano_time() - start;
-      nano_sleep(frame_nano - diff);
+      last_remaining = nano_sleep(frame_nano - diff + last_remaining);
     }
+    tui->last_frame = nano_time() - start;
     if (kbhit()) {
       if (handle_input(tui)) {
         return;

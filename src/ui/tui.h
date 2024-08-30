@@ -62,6 +62,7 @@ typedef struct TUI {
   int init_cursor_x, init_cursor_y;
   TERMINAL_CELL *cells;
   size_t cells_length;
+  uint64_t last_frame; // in nanoseconds
 } TUI;
 
 typedef enum WIDGET_TYPE {

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -11,6 +12,9 @@ void on_button_click(const MOUSE_ACTION *mouse_action) {
 
 WIDGET *ui_build(TUI *tui) {
   if (is_clicked) {
+    char frame[20+3+1];
+    const uint64_t fps = 1000000000/tui->last_frame;
+    sprintf(frame, "%ldfps", fps);
     return tui_make_box(
         -1, -1,
         tui_make_column(tui_make_widget_array(
@@ -20,7 +24,7 @@ WIDGET *ui_build(TUI *tui) {
                 tui_make_box(
                     20, 3,
                     tui_make_column(tui_make_widget_array(
-                        tui_make_text("This is the second page", COLOR_BLUE),
+                        tui_make_text(frame, COLOR_BLUE),
                         tui_make_button(tui_make_text("       Back", COLOR_RED),
                                         on_button_click))),
                     COLOR_WHITE))))),
