@@ -30,11 +30,10 @@ typedef struct MOUSE_ACTION {
 
 typedef void (*ON_CLICK_CALLBACK)(const MOUSE_ACTION *mouse_action);
 
-
 #ifndef __cplusplus
-#if (__STDC_VERSION__ < 202000L)
+  #if (__STDC_VERSION__ < 202000L)
 typedef enum bool : uint8_t { false = 0, true = 1 } bool;
-#endif
+  #endif
 #endif
 
 typedef enum COLOR {
@@ -62,7 +61,7 @@ typedef struct TUI {
   int init_cursor_x, init_cursor_y;
   TERMINAL_CELL *cells;
   size_t cells_length;
-  uint64_t last_frame; // in nanoseconds
+  uint64_t last_frame;  // in nanoseconds
 } TUI;
 
 typedef enum WIDGET_TYPE {
@@ -128,8 +127,10 @@ extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget,
                                       int height_begin, int height_end,
                                       int *child_width, int *childHeight);
 
-extern bool widget_eqauls(const WIDGET *restrict left, const WIDGET *restrict right);
-extern bool widget_array_eqauls(const WIDGET_ARRAY *restrict left, const WIDGET_ARRAY * restrict right);
+extern bool tui_widget_eqauls(const WIDGET *restrict left,
+                              const WIDGET *restrict right);
+extern bool tui_widget_array_eqauls(const WIDGET_ARRAY *restrict left,
+                                    const WIDGET_ARRAY *restrict right);
 
 extern void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps);
 
@@ -147,8 +148,8 @@ extern BUTTON_METADATA *_tui_make_button_metadata(WIDGET *restrict child,
 extern void _tui_delete_button(WIDGET *restrict button);
 
 extern WIDGET *tui_make_column(WIDGET_ARRAY *restrict children);
-extern COLUMN_METADATA *
-_tui_make_column_metadata(WIDGET_ARRAY *restrict children);
+extern COLUMN_METADATA *_tui_make_column_metadata(
+    WIDGET_ARRAY *restrict children);
 extern void _tui_delete_column(WIDGET *restrict column);
 
 extern WIDGET *tui_make_row(WIDGET_ARRAY *restrict children);
@@ -164,6 +165,8 @@ extern void _tui_delete_box(WIDGET *restrict box);
 extern WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...);
 extern void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array);
 
-#define tui_make_widget_array(...) tui_make_widget_array_raw(sizeof((WIDGET* []) {__VA_ARGS__}) / sizeof(WIDGET*), __VA_ARGS__)
+#define tui_make_widget_array(...) \
+  tui_make_widget_array_raw(       \
+      sizeof((WIDGET *[]){__VA_ARGS__}) / sizeof(WIDGET *), __VA_ARGS__)
 
 #endif

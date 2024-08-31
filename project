@@ -1,0 +1,29 @@
+#!/bin/bash
+
+project_name="atui"
+
+function compile(){
+  if [ ! -d build ]; then
+    if [ $(mkdir build) ]; then # if error
+      echo "cannot make 'build' dir"
+      exit
+    fi
+  fi
+
+  gcc -Wall -Wextra -O3 src/main.c src/ui/tui.c -o "build/$project_name"
+}
+
+function run(){
+  compile && "./build/$project_name" "$@"
+  echo
+  echo "$?"
+}
+
+function clear(){
+  rm -r ./build/
+}
+
+function_name="$1"
+shift
+
+$function_name "$@"

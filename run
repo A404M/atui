@@ -1,7 +1,0 @@
-#!/bin/bash
-
-project_name="atui"
-
-./compile && "./build/$project_name" "$@"
-echo
-echo "$?"
