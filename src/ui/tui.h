@@ -70,6 +70,7 @@ typedef enum WIDGET_TYPE {
   WIDGET_TYPE_ROW,
   WIDGET_TYPE_BOX,
   WIDGET_TYPE_CENTER,
+  WIDGET_TYPE_PADDING,
 } WIDGET_TYPE;
 
 typedef struct WIDGET {
@@ -109,6 +110,14 @@ typedef struct BOX_METADATA {
 
 typedef WIDGET CENTER_METADATA;
 
+typedef struct PADDING_METADATA {
+  WIDGET *child;
+  int padding_top;
+  int padding_bottom;
+  int padding_left;
+  int padding_right;
+} PADDING_METADATA;
+
 typedef WIDGET *(*WIDGET_BUILDER)(TUI *tui);
 
 extern TUI *tui_init();
@@ -131,7 +140,10 @@ extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget,
 
 extern void _tui_get_widget_size(const WIDGET *widget, int width_begin,
                                  int width_end, int height_begin,
-                                 int height_end, int *widget_width, int *widget_height);
+                                 int height_end, int *widget_width,
+                                 int *widget_height);
+
+extern bool _tui_is_max_width(const WIDGET *widget);
 
 extern bool tui_widget_eqauls(const WIDGET *restrict left,
                               const WIDGET *restrict right);
@@ -171,6 +183,16 @@ extern void _tui_delete_box(WIDGET *restrict box);
 extern WIDGET *tui_make_center(WIDGET *restrict child);
 extern CENTER_METADATA *_tui_make_center_metadata(WIDGET *restrict child);
 extern void _tui_delete_center(WIDGET *restrict center);
+
+extern WIDGET *tui_make_padding(WIDGET *restrict child, int padding_top,
+                                int padding_bottom, int padding_left,
+                                int padding_right);
+extern PADDING_METADATA *_tui_make_padding_metadata(WIDGET *restrict child,
+                                                    int padding_top,
+                                                    int padding_bottom,
+                                                    int padding_left,
+                                                    int padding_right);
+extern void _tui_delete_padding(WIDGET *restrict padding);
 
 extern WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...);
 extern void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array);

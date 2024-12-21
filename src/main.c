@@ -46,29 +46,30 @@ WIDGET *ui_build0(TUI *tui) {
 }
 
 WIDGET *search_box() {
-  return tui_make_box(
-      MAX_WIDTH, 1,
-      tui_make_center(tui_make_row(tui_make_widget_array(
-          tui_make_box(100, 1, NULL, COLOR_BLUE),
-          tui_make_box(10, 1,
-                       tui_make_center(tui_make_text("Search", COLOR_BLUE)),
-                       COLOR_GREEN)))),
-      COLOR_NO_COLOR);
+  return tui_make_padding(
+      tui_make_box(
+          MAX_WIDTH, 1,
+          tui_make_center(tui_make_row(tui_make_widget_array(
+              tui_make_box(MAX_WIDTH, 1, NULL, COLOR_BLUE),
+              tui_make_box(10, 1,
+                           tui_make_center(tui_make_text("Search", COLOR_BLUE)),
+                           COLOR_GREEN)
+            ))),
+          COLOR_NO_COLOR),
+      1, 1, 10, 10);
 }
 
 WIDGET *ui_build(TUI *tui) {
   return tui_make_box(
       MAX_WIDTH, MAX_HEIGHT,
       tui_make_column(tui_make_widget_array(
-          tui_make_box(0, 2, NULL, COLOR_NO_COLOR), search_box(),
-          tui_make_box(0, 2, NULL, COLOR_NO_COLOR),
-          tui_make_row(tui_make_widget_array(
-              tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
-              tui_make_button(
-                  tui_make_box(MIN_WIDTH, MIN_HEIGHT,
-                               tui_make_text("\nClick here\n", COLOR_BLUE),
-                               COLOR_WHITE),
-                  on_button_click))))),
+          search_box(),
+          tui_make_row(tui_make_widget_array(tui_make_center(tui_make_button(
+              tui_make_box(
+                  MIN_WIDTH, 3,
+                  tui_make_center(tui_make_text("Click here", COLOR_BLUE)),
+                  COLOR_WHITE),
+              on_button_click)))))),
       COLOR_MAGENTA);
 }
 
