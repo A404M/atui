@@ -10,13 +10,13 @@ void on_button_click(const MOUSE_ACTION *mouse_action) {
   is_clicked = !is_clicked;
 }
 
-WIDGET *ui_build(TUI *tui) {
+WIDGET *ui_build0(TUI *tui) {
   if (is_clicked) {
-    char frame[20+4+1];
-    const uint64_t fps = 1000000000/tui->last_frame;
+    char frame[20 + 4 + 1];
+    const uint64_t fps = 1000000000 / tui->last_frame;
     sprintf(frame, "%ldfps\n", fps);
     return tui_make_box(
-        -1, -1,
+        MAX_WIDTH, MAX_HEIGHT,
         tui_make_column(tui_make_widget_array(
             tui_make_box(0, 12, NULL, COLOR_NO_COLOR),
             tui_make_row(tui_make_widget_array(
@@ -31,7 +31,7 @@ WIDGET *ui_build(TUI *tui) {
         COLOR_MAGENTA);
   } else {
     return tui_make_box(
-        -1, -1,
+        MAX_WIDTH, MAX_HEIGHT,
         tui_make_column(tui_make_widget_array(
             tui_make_box(0, 12, NULL, COLOR_NO_COLOR),
             tui_make_row(tui_make_widget_array(
@@ -43,6 +43,33 @@ WIDGET *ui_build(TUI *tui) {
                     on_button_click))))),
         COLOR_MAGENTA);
   }
+}
+
+WIDGET *search_box() {
+  return tui_make_box(
+      MAX_WIDTH, 1,
+      tui_make_center(tui_make_row(tui_make_widget_array(
+          tui_make_box(100, 1, NULL, COLOR_BLUE),
+          tui_make_box(10, 1,
+                       tui_make_center(tui_make_text("Search", COLOR_BLUE)),
+                       COLOR_GREEN)))),
+      COLOR_NO_COLOR);
+}
+
+WIDGET *ui_build(TUI *tui) {
+  return tui_make_box(
+      MAX_WIDTH, MAX_HEIGHT,
+      tui_make_column(tui_make_widget_array(
+          tui_make_box(0, 2, NULL, COLOR_NO_COLOR), search_box(),
+          tui_make_box(0, 2, NULL, COLOR_NO_COLOR),
+          tui_make_row(tui_make_widget_array(
+              tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
+              tui_make_button(
+                  tui_make_box(MIN_WIDTH, MIN_HEIGHT,
+                               tui_make_text("\nClick here\n", COLOR_BLUE),
+                               COLOR_WHITE),
+                  on_button_click))))),
+      COLOR_MAGENTA);
 }
 
 int main() {

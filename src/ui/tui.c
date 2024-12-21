@@ -282,7 +282,7 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
             const int y = height;
             const char c = metadata->text[inserted_index];
             inserted_index += 1;
-            if (c == '\n') {// do for other spaces
+            if (c == '\n') {  // do for other spaces
               height += 1;
               j = 0;
               goto START_OF_HORIZONTAL_LOOP;
@@ -381,9 +381,145 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
       *child_width = width_end;
       *child_height = height_end;
     } break;
+    case WIDGET_TYPE_CENTER: {
+      const CENTER_METADATA *metadata = widget->metadata;
+      if (metadata != NULL) {
+        _tui_get_widget_size(metadata, width_begin, width_end, height_begin,
+                             height_end, child_width, child_height);
+        const int horizontalPadding = width_end - *child_width;
+        const int verticalPadding = height_end - *child_height;
+        const int leftPadding = horizontalPadding / 2;
+        const int rightPadding = horizontalPadding - leftPadding;
+        const int topPadding = verticalPadding / 2;
+        const int bottomPadding = verticalPadding - topPadding;
+
+        _tui_draw_widget_to_cells(
+            tui, metadata, width_begin + leftPadding, width_end - rightPadding,
+            height_begin + topPadding, height_end - bottomPadding, child_width,
+            child_height);
+      }
+    } break;
+
     default:
       fprintf(stderr, "widget type '%d' went wrong in _tui_draw_widget",
               widget->type);
+      exit(1);
+  }
+}
+
+void _tui_get_widget_size(const WIDGET *widget, int width_begin, int width_end,
+                          int height_begin, int height_end, int *widget_width,
+                          int *width_height) {
+  switch (widget->type) {
+    case WIDGET_TYPE_TEXT: {
+      const TEXT_METADATA *metadata = widget->metadata;
+      const int width_diff = width_end - width_begin;
+      const size_t text_len = strlen(metadata->text);
+      size_t inserted_index = 0;
+      int height = height_begin;
+      int max_width = width_begin;
+      for (; height < height_end; ++height) {
+        for (int j = 0; j < width_diff; ++j) {
+        START_OF_HORIZONTAL_LOOP:
+          if (inserted_index < text_len) {
+            const int x = width_begin + j;
+            const char c = metadata->text[inserted_index];
+            inserted_index += 1;
+            if (c == '\n') {  // do for other spaces
+              height += 1;
+              j = 0;
+              goto START_OF_HORIZONTAL_LOOP;
+            } else {
+              if (max_width < x) {
+                max_width = x;
+              }
+            }
+          } else {
+            goto END_OF_TEXT;
+          }
+        }
+      }
+    END_OF_TEXT:
+      *width_height = height + 1;
+      *widget_width = max_width + 1;
+    } break;
+    case WIDGET_TYPE_BUTTON: {
+      const BUTTON_METADATA *metadata = widget->metadata;
+      if (metadata->child != NULL) {
+        _tui_get_widget_size(metadata->child, width_begin, width_end,
+                             height_begin, height_end, widget_width,
+                             width_height);
+      }
+    } break;
+    case WIDGET_TYPE_COLUMN: {
+      const COLUMN_METADATA *metadata = widget->metadata;
+      *widget_width = width_begin;
+      *width_height = height_begin;
+      for (size_t i = 0; i < metadata->children->size; ++i) {
+        const WIDGET *child = metadata->children->widgets[i];
+        int width_temp;
+        _tui_get_widget_size(child, width_begin, width_end, *width_height,
+                             height_end, &width_temp, width_height);
+        if (width_temp > *widget_width) {
+          *widget_width = width_temp;
+        }
+      }
+    } break;
+    case WIDGET_TYPE_ROW: {
+      const ROW_METADATA *metadata = widget->metadata;
+      *widget_width = width_begin;
+      *width_height = height_begin;
+      for (size_t i = 0; i < metadata->children->size; ++i) {
+        const WIDGET *child = metadata->children->widgets[i];
+        int height_temp;
+        _tui_get_widget_size(child, *widget_width, width_end, height_begin,
+                             height_end, widget_width, &height_temp);
+        if (height_temp > *width_height) {
+          *width_height = height_temp;
+        }
+      }
+    } break;
+    case WIDGET_TYPE_BOX: {
+      const BOX_METADATA *metadata = widget->metadata;
+
+      if (metadata->width != MIN_WIDTH && metadata->width != MAX_WIDTH) {
+        width_end = metadata->width + width_begin >= width_end
+                        ? width_end
+                        : metadata->width + width_begin;
+      }
+      if (metadata->height != MIN_HEIGHT && metadata->height != MAX_HEIGHT) {
+        height_end = metadata->height + height_begin >= height_end
+                         ? height_end
+                         : metadata->height + height_begin;
+      }
+
+      if (metadata->child != NULL) {
+        int temp_width, temp_height;
+        _tui_get_widget_size(metadata->child, width_begin, width_end,
+                             height_begin, height_end, &temp_width,
+                             &temp_height);
+        if (metadata->width == MIN_WIDTH) {
+          width_end = temp_width;
+        }
+        if (metadata->height == MIN_HEIGHT) {
+          height_end = temp_height;
+        }
+      }
+
+      *widget_width = width_end;
+      *width_height = height_end;
+    } break;
+    case WIDGET_TYPE_CENTER: {
+      const CENTER_METADATA *metadata = widget->metadata;
+      if (metadata != NULL) {
+        _tui_get_widget_size(metadata, width_begin, width_end, height_begin,
+                             height_end, widget_width, width_height);
+      }
+    } break;
+
+    default:
+      fprintf(stderr, "widget type '%d' went wrong in %s %d", widget->type,
+              __FILE__, __LINE__);
       exit(1);
   }
 }
@@ -503,8 +639,14 @@ bool tui_widget_eqauls(const WIDGET *restrict left,
              left_data->color == right_data->color &&
              tui_widget_eqauls(left_data->child, right_data->child);
     } break;
+    case WIDGET_TYPE_CENTER: {
+      const CENTER_METADATA *left_data = left->metadata;
+      const CENTER_METADATA *right_data = right->metadata;
+      return tui_widget_eqauls(left_data, right_data);
+    } break;
     default:
-      fprintf(stderr, "Type error '%d' in tui_delete_widget\n", left->type);
+      fprintf(stderr, "Type error '%d' in %s %d\n", left->type, __FILE__,
+              __LINE__);
       exit(1);
   }
 
@@ -521,7 +663,7 @@ int64_t nano_sleep(long int nano_seconds) {
 }
 
 long int nano_time() {
-  struct timespec t = {0, 0}, tend = {0, 0};
+  struct timespec t = {0, 0};
   clock_gettime(CLOCK_MONOTONIC, &t);
   return t.tv_sec * NANO_TO_SECOND + t.tv_nsec;
 }
@@ -586,8 +728,12 @@ void tui_delete_widget(WIDGET *restrict widget) {
     case WIDGET_TYPE_BOX:
       _tui_delete_box(widget);
       break;
+    case WIDGET_TYPE_CENTER:
+      _tui_delete_center(widget);
+      break;
     default:
-      fprintf(stderr, "Type error '%d' in tui_delete_widget\n", widget->type);
+      fprintf(stderr, "Type error '%d' in %s %d\n", widget->type, __FILE__,
+              __LINE__);
       exit(1);
   }
   free(widget);
@@ -680,6 +826,18 @@ BOX_METADATA *_tui_make_box_metadata(WIDGET *restrict child, int width,
 void _tui_delete_box(WIDGET *box) {
   tui_delete_widget(((BOX_METADATA *)box->metadata)->child);
   free(box->metadata);
+}
+
+WIDGET *tui_make_center(WIDGET *restrict child) {
+  return tui_new_widget(WIDGET_TYPE_CENTER, _tui_make_center_metadata(child));
+}
+
+CENTER_METADATA *_tui_make_center_metadata(WIDGET *restrict child) {
+  return child;
+}
+
+void _tui_delete_center(WIDGET *restrict center) {
+  tui_delete_widget(center->metadata);
 }
 
 WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...) {

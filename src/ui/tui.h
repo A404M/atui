@@ -1,5 +1,4 @@
-#ifndef A404M_UI_TUI
-#define A404M_UI_TUI 1
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -70,6 +69,7 @@ typedef enum WIDGET_TYPE {
   WIDGET_TYPE_COLUMN,
   WIDGET_TYPE_ROW,
   WIDGET_TYPE_BOX,
+  WIDGET_TYPE_CENTER,
 } WIDGET_TYPE;
 
 typedef struct WIDGET {
@@ -107,6 +107,8 @@ typedef struct BOX_METADATA {
   COLOR color;
 } BOX_METADATA;
 
+typedef WIDGET CENTER_METADATA;
+
 typedef WIDGET *(*WIDGET_BUILDER)(TUI *tui);
 
 extern TUI *tui_init();
@@ -125,7 +127,11 @@ extern void tui_start_app(TUI *tui, WIDGET_BUILDER widget_builder, int fps);
 extern void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget,
                                       int width_begin, int width_end,
                                       int height_begin, int height_end,
-                                      int *child_width, int *childHeight);
+                                      int *child_width, int *child_height);
+
+extern void _tui_get_widget_size(const WIDGET *widget, int width_begin,
+                                 int width_end, int height_begin,
+                                 int height_end, int *widget_width, int *widget_height);
 
 extern bool tui_widget_eqauls(const WIDGET *restrict left,
                               const WIDGET *restrict right);
@@ -162,11 +168,13 @@ extern BOX_METADATA *_tui_make_box_metadata(WIDGET *restrict child, int width,
                                             int height, COLOR color);
 extern void _tui_delete_box(WIDGET *restrict box);
 
+extern WIDGET *tui_make_center(WIDGET *restrict child);
+extern CENTER_METADATA *_tui_make_center_metadata(WIDGET *restrict child);
+extern void _tui_delete_center(WIDGET *restrict center);
+
 extern WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...);
 extern void _tui_delete_widget_array(WIDGET_ARRAY *restrict widget_array);
 
 #define tui_make_widget_array(...) \
   tui_make_widget_array_raw(       \
       sizeof((WIDGET *[]){__VA_ARGS__}) / sizeof(WIDGET *), __VA_ARGS__)
-
-#endif
