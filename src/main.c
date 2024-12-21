@@ -2,75 +2,35 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "ui/color.h"
 #include "ui/tui.h"
-
-bool is_clicked = false;
-
-void on_button_click(const MOUSE_ACTION *mouse_action) {
-  is_clicked = !is_clicked;
-}
-
-WIDGET *ui_build0(TUI *tui) {
-  if (is_clicked) {
-    char frame[20 + 4 + 1];
-    const uint64_t fps = 1000000000 / tui->last_frame;
-    sprintf(frame, "%ldfps\n", fps);
-    return tui_make_box(
-        MAX_WIDTH, MAX_HEIGHT,
-        tui_make_column(tui_make_widget_array(
-            tui_make_box(0, 12, NULL, COLOR_NO_COLOR),
-            tui_make_row(tui_make_widget_array(
-                tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
-                tui_make_box(
-                    20, 3,
-                    tui_make_column(tui_make_widget_array(
-                        tui_make_text(frame, COLOR_BLUE),
-                        tui_make_button(tui_make_text("Back", COLOR_RED),
-                                        on_button_click))),
-                    COLOR_WHITE))))),
-        COLOR_MAGENTA);
-  } else {
-    return tui_make_box(
-        MAX_WIDTH, MAX_HEIGHT,
-        tui_make_column(tui_make_widget_array(
-            tui_make_box(0, 12, NULL, COLOR_NO_COLOR),
-            tui_make_row(tui_make_widget_array(
-                tui_make_box(50, 0, NULL, COLOR_NO_COLOR),
-                tui_make_button(
-                    tui_make_box(MIN_WIDTH, MIN_HEIGHT,
-                                 tui_make_text("\nClick here\n", COLOR_BLUE),
-                                 COLOR_WHITE),
-                    on_button_click))))),
-        COLOR_MAGENTA);
-  }
-}
 
 WIDGET *search_box() {
   return tui_make_padding(
-      tui_make_box(
-          MAX_WIDTH, 1,
-          tui_make_center(tui_make_row(tui_make_widget_array(
-              tui_make_box(MAX_WIDTH, 1, NULL, COLOR_BLUE),
-              tui_make_box(10, 1,
-                           tui_make_center(tui_make_text("Search", COLOR_BLUE)),
-                           COLOR_GREEN)
-            ))),
-          COLOR_NO_COLOR),
+      tui_make_box(MAX_WIDTH, 1,
+                   tui_make_center(tui_make_row(tui_make_widget_array(
+                       tui_make_box(MAX_WIDTH, 1, NULL, color_init(0xFF42414D)),
+                       tui_make_box(10, 1,
+                                    tui_make_center(tui_make_text(
+                                        "Search", color_init(0xFF000000))),
+                                    color_init(0xFFC4C3C9))))),
+                   COLOR_NO_COLOR),
       1, 1, 10, 10);
 }
+
+WIDGET *search_header() {}
 
 WIDGET *ui_build(TUI *tui) {
   return tui_make_box(
       MAX_WIDTH, MAX_HEIGHT,
       tui_make_column(tui_make_widget_array(
           search_box(),
-          tui_make_row(tui_make_widget_array(tui_make_center(tui_make_button(
-              tui_make_box(
-                  MIN_WIDTH, 3,
-                  tui_make_center(tui_make_text("Click here", COLOR_BLUE)),
-                  COLOR_WHITE),
-              on_button_click)))))),
-      COLOR_MAGENTA);
+          tui_make_row(tui_make_widget_array(tui_make_center(
+              tui_make_box(MIN_WIDTH, 3,
+                           tui_make_center(tui_make_text(
+                               "Hi here", color_init(0xFF0000FF))),
+                           color_init(0xFFFFFFFF))))))),
+      color_init(0xFF2B2A33));
 }
 
 int main() {

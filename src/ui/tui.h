@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <ui/color.h>
 
 extern const int MAX_WIDTH;
 extern const int MAX_HEIGHT;
@@ -34,18 +35,6 @@ typedef void (*ON_CLICK_CALLBACK)(const MOUSE_ACTION *mouse_action);
 typedef enum bool : uint8_t { false = 0, true = 1 } bool;
   #endif
 #endif
-
-typedef enum COLOR {
-  COLOR_NO_COLOR = -1,
-  COLOR_RESET = 0,
-  COLOR_RED = 1,
-  COLOR_GREEN = 2,
-  COLOR_YELLOW = 3,
-  COLOR_BLUE = 4,
-  COLOR_MAGENTA = 5,
-  COLOR_CYAN = 6,
-  COLOR_WHITE = 7
-} COLOR;
 
 typedef struct TERMINAL_CELL {
   char c;

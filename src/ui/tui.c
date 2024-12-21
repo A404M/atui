@@ -9,6 +9,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "ui/color.h"
+
 const int MAX_WIDTH = -1;
 const int MAX_HEIGHT = -1;
 
@@ -141,7 +143,7 @@ void _tui_set_cell_char(TUI *tui, int x, int y, char c) {
 }
 
 void _tui_set_cell_color(TUI *tui, int x, int y, COLOR color) {
-  if (color == COLOR_NO_COLOR) {
+  if (color_equals(color, COLOR_NO_COLOR)) {
     return;
   }
   tui->cells[_tui_get_cell_index(tui, x, y)].color = color;
@@ -149,7 +151,7 @@ void _tui_set_cell_color(TUI *tui, int x, int y, COLOR color) {
 
 void _tui_set_cell_background_color(TUI *tui, int x, int y,
                                     COLOR background_color) {
-  if (background_color == COLOR_NO_COLOR) {
+  if (color_equals(background_color, COLOR_NO_COLOR)) {
     return;
   }
   tui->cells[_tui_get_cell_index(tui, x, y)].background_color =
@@ -158,11 +160,11 @@ void _tui_set_cell_background_color(TUI *tui, int x, int y,
 
 void _tui_set_cell_background_color_if_not_set(TUI *tui, int x, int y,
                                                COLOR background_color) {
-  if (background_color == COLOR_NO_COLOR) {
+  if (color_equals(background_color, COLOR_NO_COLOR)) {
     return;
   }
   TERMINAL_CELL *cell = &tui->cells[_tui_get_cell_index(tui, x, y)];
-  if (cell->background_color == COLOR_NO_COLOR) {
+  if (color_equals(cell->background_color, COLOR_NO_COLOR)) {
     cell->background_color = background_color;
   }
 }
@@ -182,8 +184,9 @@ void tui_handle_mouse_action(TUI *tui, const MOUSE_ACTION *mouse_action) {
   }
 }
 
+/*
 int tui_change_terminal_text_color(COLOR color) {
-  if (color == COLOR_NO_COLOR) {
+  if (color_equals(color, COLOR_NO_COLOR)) {
     return 0;
   } else if (color == COLOR_RESET) {
     return printf("\033[%dm", COLOR_RESET);
@@ -199,6 +202,7 @@ int tui_change_terminal_background_color(COLOR color) {
   }
   return printf("\033[%dm", color + 40);
 }
+*/
 
 bool handle_input(TUI *tui) {
   unsigned char buff[6];
@@ -616,7 +620,7 @@ bool _tui_is_max_width(const WIDGET *widget) {
         return true;
       } else if (metadata->width == MIN_WIDTH) {
         return _tui_is_max_width(metadata->child);
-      }else{
+      } else {
         return false;
       }
     }
@@ -632,14 +636,16 @@ bool _tui_is_max_width(const WIDGET *widget) {
 
 void _tui_move_to_start_in_str(char *str) { strcpy(str, "\033[;H"); }
 
+/*
 int _tui_get_background_color_ascii(COLOR color) {
-  if (color == COLOR_NO_COLOR) {
+  if (color_equals(color, COLOR_NO_COLOR)) {
     return 0;
   } else if (color == COLOR_RESET) {
     return printf("\033[%dm", COLOR_RESET);
   }
   return printf("\033[%dm", color + 40);
 }
+*/
 
 void _tui_draw_cells_to_terminal(TUI *tui) {
   const size_t size_of_cell = 5 + 5 + sizeof(char) + 5;
@@ -648,7 +654,7 @@ void _tui_draw_cells_to_terminal(TUI *tui) {
 
   _tui_move_to_start_in_str(str);
 
-  char cell_str[5];
+  char cell_str[20];
 
   COLOR last_color = COLOR_NO_COLOR;
   COLOR last_background_color = COLOR_NO_COLOR;
@@ -656,24 +662,21 @@ void _tui_draw_cells_to_terminal(TUI *tui) {
   for (size_t i = 0; i < tui->cells_length; ++i) {
     const TERMINAL_CELL cell = tui->cells[i];
 
-    if (last_color != cell.color ||
-        last_background_color != cell.background_color) {
-      sprintf(cell_str, "\033[%dm", COLOR_RESET);
+    if (color_not_equals(last_color, cell.color) ||
+        color_not_equals(last_background_color, cell.background_color)) {
+      sprintf(cell_str, "\033[0m");
       strcat(str, cell_str);
       last_color = cell.color;
       last_background_color = cell.background_color;
-      if (cell.color == COLOR_RESET || cell.color == COLOR_NO_COLOR) {
-        sprintf(cell_str, "\033[%dm", COLOR_RESET);
-      } else {
-        sprintf(cell_str, "\033[%dm", cell.color + 30);
+      if (color_not_equals(cell.color, COLOR_NO_COLOR)) {
+        sprintf(cell_str, "\033[38;2;%d;%d;%dm", cell.color.r, cell.color.g,
+                cell.color.b);
       }
       strcat(str, cell_str);
 
-      if (cell.background_color == COLOR_RESET ||
-          cell.background_color == COLOR_NO_COLOR) {
-        sprintf(cell_str, "\033[%dm", COLOR_RESET);
-      } else {
-        sprintf(cell_str, "\033[%dm", cell.background_color + 40);
+      if (color_not_equals(cell.background_color, COLOR_NO_COLOR)) {
+        sprintf(cell_str, "\033[48;2;%d;%d;%dm", cell.background_color.r,
+                cell.background_color.g, cell.background_color.b);
       }
       strcat(str, cell_str);
     }
@@ -718,7 +721,7 @@ bool tui_widget_eqauls(const WIDGET *restrict left,
     case WIDGET_TYPE_TEXT: {
       const TEXT_METADATA *left_data = left->metadata;
       const TEXT_METADATA *right_data = right->metadata;
-      return left_data->color == right_data->color &&
+      return color_equals(left_data->color, right_data->color) &&
              strcmp(left_data->text, right_data->text) == 0;
     }
     case WIDGET_TYPE_BUTTON: {
@@ -742,7 +745,7 @@ bool tui_widget_eqauls(const WIDGET *restrict left,
       const BOX_METADATA *right_data = right->metadata;
       return left_data->width == right_data->width &&
              left_data->height == right_data->height &&
-             left_data->color == right_data->color &&
+             color_equals(left_data->color, right_data->color) &&
              tui_widget_eqauls(left_data->child, right_data->child);
     }
     case WIDGET_TYPE_CENTER: {
