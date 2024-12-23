@@ -14,7 +14,7 @@ NC := \033[0m
 INC_DIRS := $(SRC_DIR)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CFLAGS := $(INC_FLAGS) -Wall -Wextra -std=gnu23 -Ofast
+CFLAGS := $(INC_FLAGS) -Wall -Wextra -std=gnu23 -Ofast -march=native
 
 EXEC_FILE := $(BUILD_DIR)/atui
 

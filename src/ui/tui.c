@@ -20,12 +20,14 @@ const int MIN_HEIGHT = -2;
 const int FRAME_UNLIMITED = 0;
 
 void _tui_clear_cells(TUI *tui) {
-  const TERMINAL_CELL empty = {.c = ' ',
-                               .color = COLOR_NO_COLOR,
-                               .background_color = COLOR_NO_COLOR,
-                               .on_click_callback = NULL};
+  constexpr TERMINAL_CELL EMPTY_CELL = {
+      .c = ' ',
+      .color = COLOR_NO_COLOR,
+      .background_color = COLOR_NO_COLOR,
+      .on_click_callback = NULL,
+  };
   for (size_t i = 0; i < tui->cells_length; ++i) {
-    tui->cells[i] = empty;
+    tui->cells[i] = EMPTY_CELL;
   }
 }
 
@@ -183,26 +185,6 @@ void tui_handle_mouse_action(TUI *tui, const MOUSE_ACTION *mouse_action) {
     callback(mouse_action);
   }
 }
-
-/*
-int tui_change_terminal_text_color(COLOR color) {
-  if (color_equals(color, COLOR_NO_COLOR)) {
-    return 0;
-  } else if (color == COLOR_RESET) {
-    return printf("\033[%dm", COLOR_RESET);
-  }
-  return printf("\033[%dm", color + 30);
-}
-
-int tui_change_terminal_background_color(COLOR color) {
-  if (color == COLOR_NO_COLOR) {
-    return 0;
-  } else if (color == COLOR_RESET) {
-    return printf("\033[%dm", COLOR_RESET);
-  }
-  return printf("\033[%dm", color + 40);
-}
-*/
 
 bool handle_input(TUI *tui) {
   unsigned char buff[6];
@@ -418,12 +400,12 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
       if (metadata != NULL) {
         _tui_get_widget_size(metadata, width_begin, width_end, height_begin,
                              height_end, child_width, child_height);
-        const int horizontalPadding = width_end - *child_width;
-        const int verticalPadding = height_end - *child_height;
-        const int leftPadding = horizontalPadding / 2;
-        const int rightPadding = horizontalPadding - leftPadding;
-        const int bottomPadding = verticalPadding / 2;
-        const int topPadding = verticalPadding - bottomPadding;
+        const uint horizontalPadding = width_end - *child_width;
+        const uint verticalPadding = height_end - *child_height;
+        const uint leftPadding = horizontalPadding / 2;
+        const uint rightPadding = horizontalPadding - leftPadding;
+        const uint bottomPadding = verticalPadding / 2;
+        const uint topPadding = verticalPadding - bottomPadding;
 
         _tui_draw_widget_to_cells(
             tui, metadata, width_begin + leftPadding, width_end - rightPadding,
@@ -440,6 +422,14 @@ void _tui_draw_widget_to_cells(TUI *tui, const WIDGET *widget, int width_begin,
             width_end - metadata->padding_right,
             height_begin + metadata->padding_top,
             height_end - metadata->padding_bottom, child_width, child_height);
+        *child_width += metadata->padding_left + metadata->padding_right;
+        *child_height += metadata->padding_top + metadata->padding_bottom;
+        if (*child_width > width_end) {
+          *child_width = width_end;
+        }
+        if (*child_height > height_end) {
+          *child_height = height_end;
+        }
       }
     }
       return;
@@ -579,6 +569,7 @@ void _tui_get_widget_size(const WIDGET *widget, int width_begin, int width_end,
           *widget_height = height_end;
         }
       }
+      return;
   }
   fprintf(stderr, "widget type '%d' went wrong in %s %d", widget->type,
           __FILE_NAME__, __LINE__);
@@ -591,6 +582,7 @@ bool _tui_is_max_width(const WIDGET *widget) {
   }
   switch (widget->type) {
     case WIDGET_TYPE_TEXT:
+    case WIDGET_TYPE_TEXT_INPUT:
       return false;
     case WIDGET_TYPE_BUTTON:
       return _tui_is_max_width(((BUTTON_METADATA *)widget->metadata)->child);
@@ -762,32 +754,43 @@ bool tui_widget_eqauls(const WIDGET *restrict left,
              left_data->padding_left == right_data->padding_left &&
              left_data->padding_right == right_data->padding_right;
     }
+    case WIDGET_TYPE_TEXT_INPUT: {
+      const TEXT_INPUT_METADATA *left_data = left->metadata;
+      const TEXT_INPUT_METADATA *right_data = right->metadata;
+      return color_equals(left_data->color, right_data->color) &&
+             strcmp(left_data->text, right_data->text) == 0 &&
+             left_data->on_text_input == right_data->on_text_input;
+    }
   }
   fprintf(stderr, "Type error '%d' in %s %d\n", left->type, __FILE__, __LINE__);
   exit(1);
 }
 
-const int NANO_TO_SECOND = 1000000000;
-
-int64_t nano_sleep(long int nano_seconds) {
+int64_t nano_sleep(uint64_t nano_seconds) {
   struct timespec remaining,
       request = {nano_seconds / NANO_TO_SECOND, nano_seconds % NANO_TO_SECOND};
   nanosleep(&request, &remaining);
-  return remaining.tv_sec * NANO_TO_SECOND + remaining.tv_nsec;
+  int64_t ret = remaining.tv_sec * NANO_TO_SECOND + remaining.tv_nsec;
+  if (ret < 0 || ret > NANO_TO_SECOND) {  // TODO: fix later
+    return 0;
+  } else {
+    return ret;
+  }
 }
 
-long int nano_time() {
+int64_t nano_time() {
   struct timespec t = {0, 0};
   clock_gettime(CLOCK_MONOTONIC, &t);
   return t.tv_sec * NANO_TO_SECOND + t.tv_nsec;
 }
 
+uint64_t frame_count = 0;
 void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
-  const long int frame_nano =
+  const uint64_t frame_nano =
       (fps == FRAME_UNLIMITED) ? 0 : NANO_TO_SECOND / fps;
   int64_t last_remaining = 0;
   while (1) {
-    const long int start = nano_time();
+    const int64_t start = nano_time();
     tui_save_cursor();
     tui_refresh(tui);
     WIDGET *root_widget = widget_builder(tui);
@@ -803,10 +806,11 @@ void tui_main_loop(TUI *tui, WIDGET_BUILDER widget_builder, int fps) {
     /*printf("%ld\t%ld", last_frame_time, frame_nano);*/
     tui_restore_cursor();
     if (fps != FRAME_UNLIMITED) {
-      const long int diff = nano_time() - start;
+      const int64_t diff = nano_time() - start;
       last_remaining = nano_sleep(frame_nano - diff + last_remaining);
     }
     tui->last_frame = nano_time() - start;
+    ++frame_count;
     if (kbhit()) {
       if (handle_input(tui)) {
         return;
@@ -847,6 +851,9 @@ void tui_delete_widget(WIDGET *restrict widget) {
       goto RETURN_SUCCESS;
     case WIDGET_TYPE_PADDING:
       _tui_delete_padding(widget);
+      goto RETURN_SUCCESS;
+    case WIDGET_TYPE_TEXT_INPUT:
+      _tui_delete_input_text(widget);
       goto RETURN_SUCCESS;
   }
   fprintf(stderr, "Type error '%d' in %s %d\n", widget->type, __FILE__,
@@ -981,6 +988,26 @@ PADDING_METADATA *_tui_make_padding_metadata(WIDGET *restrict child,
 void _tui_delete_padding(WIDGET *restrict padding) {
   tui_delete_widget(((PADDING_METADATA *)padding->metadata)->child);
   free(padding->metadata);
+}
+
+extern WIDGET *tui_make_text_input(char *restrict text, COLOR color,
+                                   ON_TEXT_INPUT on_text_input) {
+  return tui_new_widget(
+      WIDGET_TYPE_TEXT_INPUT,
+      _tui_make_text_input_metadata(text, color, on_text_input));
+}
+extern TEXT_INPUT_METADATA *_tui_make_text_input_metadata(
+    char *restrict text, COLOR color, ON_TEXT_INPUT on_text_input) {
+  TEXT_INPUT_METADATA *metadata = malloc(sizeof(*metadata));
+  metadata->text = malloc(strlen(text) + 1);
+  strcpy(metadata->text, text);
+  metadata->color = color;
+  metadata->on_text_input = on_text_input;
+  return metadata;
+}
+extern void _tui_delete_input_text(WIDGET *restrict text_input) {
+  free(((TEXT_INPUT_METADATA *)text_input->metadata)->text);
+  free(text_input->metadata);
 }
 
 WIDGET_ARRAY *tui_make_widget_array_raw(size_t size, ...) {

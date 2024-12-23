@@ -52,6 +52,8 @@ typedef struct TUI {
   uint64_t last_frame;  // in nanoseconds
 } TUI;
 
+constexpr int64_t NANO_TO_SECOND = 1000000000;
+
 typedef enum WIDGET_TYPE {
   WIDGET_TYPE_TEXT,
   WIDGET_TYPE_BUTTON,
@@ -60,6 +62,7 @@ typedef enum WIDGET_TYPE {
   WIDGET_TYPE_BOX,
   WIDGET_TYPE_CENTER,
   WIDGET_TYPE_PADDING,
+  WIDGET_TYPE_TEXT_INPUT,
 } WIDGET_TYPE;
 
 typedef struct WIDGET {
@@ -106,6 +109,14 @@ typedef struct PADDING_METADATA {
   int padding_left;
   int padding_right;
 } PADDING_METADATA;
+
+typedef void (*ON_TEXT_INPUT)(char c);
+
+typedef struct TEXT_INPUT_METADATA {
+  char *text;
+  COLOR color;
+  ON_TEXT_INPUT on_text_input;
+} TEXT_INPUT_METADATA;
 
 typedef WIDGET *(*WIDGET_BUILDER)(TUI *tui);
 
@@ -172,6 +183,12 @@ extern void _tui_delete_box(WIDGET *restrict box);
 extern WIDGET *tui_make_center(WIDGET *restrict child);
 extern CENTER_METADATA *_tui_make_center_metadata(WIDGET *restrict child);
 extern void _tui_delete_center(WIDGET *restrict center);
+
+extern WIDGET *tui_make_text_input(char *restrict text, COLOR color,
+                                   ON_TEXT_INPUT on_text_input);
+extern TEXT_INPUT_METADATA *_tui_make_text_input_metadata(
+    char *restrict text, COLOR color, ON_TEXT_INPUT on_text_input);
+extern void _tui_delete_input_text(WIDGET *restrict text_input);
 
 extern WIDGET *tui_make_padding(WIDGET *restrict child, int padding_top,
                                 int padding_bottom, int padding_left,

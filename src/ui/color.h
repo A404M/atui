@@ -6,11 +6,12 @@ typedef struct COLOR {
   uint8_t b, g, r, a;
 } COLOR;
 
-#define color_hex(value) \
-  (uint8_t)((uint32_t)value >> 3), \
-  (uint8_t)((uint32_t)value >> 2), \
-  (uint8_t)((uint32_t)value >> 1), \
-  (uint8_t)((uint32_t)value >> 0) \
+#define color_hex(value) { \
+  (uint8_t)(((uint32_t)value >> 8*0)&0xFF), \
+  (uint8_t)(((uint32_t)value >> 8*1)&0xFF), \
+  (uint8_t)(((uint32_t)value >> 8*2)&0xFF), \
+  (uint8_t)(((uint32_t)value >> 8*3)&0xFF), \
+}
 
 constexpr COLOR COLOR_NO_COLOR = {
     .a = 0,
